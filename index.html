@@ -1,0 +1,1415 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Before-After</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: oklch(1.000 0.000 0);
+      --surface: oklch(0.973 0.008 112);
+      --surface-strong: oklch(0.944 0.014 112);
+      --ink: oklch(0.190 0.026 112);
+      --muted: oklch(0.420 0.024 112);
+      --line: oklch(0.850 0.018 112);
+      --primary: oklch(0.510 0.120 112);
+      --primary-hover: oklch(0.450 0.120 112);
+      --primary-soft: oklch(0.910 0.060 112);
+      --accent: oklch(0.590 0.160 38);
+      --before: oklch(0.640 0.170 240);
+      --before-soft: oklch(0.930 0.050 240);
+      --after: oklch(0.820 0.150 86);
+      --after-soft: oklch(0.955 0.060 86);
+      --danger: oklch(0.560 0.160 25);
+      --danger-soft: oklch(0.960 0.035 25);
+      --shadow: 0 8px 22px oklch(0.190 0.026 112 / 0.08);
+      --radius: 8px;
+      --control: 46px;
+      font-family: "Leelawadee UI", "Noto Sans Thai", Tahoma, system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        linear-gradient(180deg, oklch(0.985 0.005 112), var(--bg) 280px);
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      min-height: var(--control);
+      border: 0;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+      touch-action: manipulation;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+      transform: none;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid oklch(0.760 0.120 112 / 0.45);
+      outline-offset: 2px;
+    }
+
+    .app {
+      width: min(100%, 1080px);
+      margin: 0 auto;
+      padding: 16px;
+      padding-bottom: 104px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 8px 0 16px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: oklch(0.310 0.090 112);
+      font-size: 0.9rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .panel {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 1.08rem;
+      line-height: 1.25;
+    }
+
+    .metric {
+      color: var(--muted);
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      color: var(--ink);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .field-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    input {
+      width: 100%;
+      min-height: var(--control);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--ink);
+      padding: 10px 12px;
+    }
+
+    input::placeholder {
+      color: oklch(0.470 0.020 112);
+    }
+
+    .task-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 108px;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .task-form .full {
+      grid-column: 1 / -1;
+    }
+
+    .primary-btn,
+    .secondary-btn,
+    .ghost-btn,
+    .danger-btn,
+    .before-btn,
+    .after-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 9px 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .primary-btn {
+      background: var(--primary);
+      color: white;
+    }
+
+    .primary-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .secondary-btn {
+      background: var(--surface-strong);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .secondary-btn:hover {
+      background: oklch(0.920 0.018 112);
+    }
+
+    .ghost-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--line);
+    }
+
+    .ghost-btn:hover {
+      color: var(--ink);
+      background: var(--surface);
+    }
+
+    .danger-btn {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border: 1px solid oklch(0.840 0.060 25);
+    }
+
+    .before-btn {
+      background: var(--before-soft);
+      color: oklch(0.330 0.120 240);
+      border: 1px solid oklch(0.760 0.090 240);
+    }
+
+    .after-btn {
+      background: var(--after-soft);
+      color: oklch(0.330 0.090 86);
+      border: 1px solid oklch(0.800 0.100 86);
+    }
+
+    .tasks {
+      display: grid;
+      gap: 12px;
+    }
+
+    .empty-state {
+      display: grid;
+      place-items: center;
+      min-height: 116px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .task-item {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: var(--surface);
+    }
+
+    .task-head {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+    }
+
+    .task-no {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      font-weight: 900;
+    }
+
+    .task-name {
+      margin: 0;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .task-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .slot-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .slot-row {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+    }
+
+    .slot-index {
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .thumb {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 84px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 800;
+      aspect-ratio: 4 / 3;
+    }
+
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb button {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      min-height: 30px;
+      min-width: 30px;
+      padding: 0;
+      border-radius: 999px;
+      background: oklch(0.120 0.000 0 / 0.72);
+      color: white;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .preview-panel {
+      display: grid;
+      gap: 14px;
+    }
+
+    .preview-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .preview-pages {
+      display: grid;
+      gap: 16px;
+    }
+
+    .page-preview {
+      display: grid;
+      gap: 8px;
+    }
+
+    .page-preview-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 800;
+    }
+
+    canvas.sheet {
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: white;
+    }
+
+    .bottom-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: oklch(1.000 0.000 0 / 0.94);
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+
+    .bottom-inner {
+      width: min(100%, 1080px);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .toast {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 86px;
+      z-index: 30;
+      display: none;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: white;
+      font-weight: 700;
+      box-shadow: 0 8px 20px oklch(0.190 0.026 112 / 0.18);
+    }
+
+    .toast.show {
+      display: block;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (min-width: 760px) {
+      .app {
+        padding: 22px;
+        padding-bottom: 112px;
+      }
+
+      .topbar {
+        align-items: center;
+      }
+
+      .brand h1 {
+        font-size: 2rem;
+      }
+
+      .layout {
+        grid-template-columns: 410px minmax(0, 1fr);
+        align-items: start;
+      }
+
+      .sticky-stack {
+        position: sticky;
+        top: 16px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .task-form {
+        grid-template-columns: minmax(0, 1fr) 116px;
+      }
+
+      .preview-pages {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .toast {
+        left: auto;
+        right: 22px;
+        width: min(390px, calc(100% - 44px));
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>Before-After</h1>
+        <p>จัดรูปงานรายวันเป็นภาพ A4 พร้อมส่งต่อ</p>
+      </div>
+      <span class="status-pill" id="pageCountPill">0 หน้า</span>
+    </header>
+
+    <main class="layout">
+      <div class="sticky-stack">
+        <section class="panel" aria-labelledby="setupTitle">
+          <div class="panel-title">
+            <h2 id="setupTitle">ข้อมูลงาน</h2>
+          </div>
+
+          <div class="grid">
+            <div class="field">
+              <label for="workDate">วันที่</label>
+              <input id="workDate" type="text" inputmode="numeric" autocomplete="off" placeholder="วว/ดด/พ.ศ.">
+              <p class="field-note" id="thaiDateText"></p>
+            </div>
+
+            <div class="field">
+              <label for="buildingInput">ชื่ออาคาร</label>
+              <input id="buildingInput" list="buildingHistory" autocomplete="off" placeholder="เช่น อาคาร G">
+              <datalist id="buildingHistory"></datalist>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="addTaskTitle">
+          <div class="panel-title">
+            <h2 id="addTaskTitle">เพิ่มงาน</h2>
+          </div>
+
+          <form class="task-form" id="taskForm">
+            <div class="field full">
+              <label for="taskNameInput">ชื่องาน</label>
+              <input id="taskNameInput" list="taskHistory" autocomplete="off" placeholder="เช่น งานเข้าแบบฐานราก">
+              <datalist id="taskHistory"></datalist>
+            </div>
+
+            <div class="field">
+              <label for="peopleInput">จำนวนคน</label>
+              <input id="peopleInput" type="number" inputmode="numeric" min="1" step="1" placeholder="2">
+            </div>
+
+            <button class="primary-btn" type="submit">เพิ่มงาน</button>
+          </form>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="taskListTitle">
+        <div class="panel-title">
+          <h2 id="taskListTitle">รายการงาน</h2>
+          <span class="metric" id="taskSummary">0 งาน</span>
+        </div>
+
+        <div class="tasks" id="taskList"></div>
+      </section>
+
+      <section class="panel preview-panel" aria-labelledby="previewTitle">
+        <div class="preview-toolbar">
+          <div>
+            <h2 id="previewTitle">ตัวอย่าง A4</h2>
+            <div class="metric" id="previewSummary">ยังไม่มีหน้า</div>
+          </div>
+          <button class="ghost-btn" type="button" id="clearAllBtn">ล้างทั้งหมด</button>
+        </div>
+        <div class="preview-pages" id="previewPages"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="bottom-inner">
+      <button class="secondary-btn" type="button" id="previewBtn">ดูตัวอย่าง</button>
+      <button class="primary-btn" type="button" id="exportBtn">ดาวน์โหลด PNG</button>
+    </div>
+  </div>
+
+  <input class="sr-only" id="imagePicker" type="file" accept="image/*" multiple>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const A4 = { width: 1240, height: 1754 };
+      const MAX_PAIRS_PER_PAGE = 3;
+      const BUILDING_KEY = "beforeAfter.buildings.v1";
+      const TASK_KEY = "beforeAfter.tasks.v1";
+      const DRAFT_KEY = "beforeAfter.textDraft.v1";
+
+      const state = {
+        tasks: [],
+        pickTarget: null,
+        toastTimer: null
+      };
+
+      const el = {
+        workDate: document.getElementById("workDate"),
+        thaiDateText: document.getElementById("thaiDateText"),
+        buildingInput: document.getElementById("buildingInput"),
+        buildingHistory: document.getElementById("buildingHistory"),
+        taskForm: document.getElementById("taskForm"),
+        taskNameInput: document.getElementById("taskNameInput"),
+        peopleInput: document.getElementById("peopleInput"),
+        taskHistory: document.getElementById("taskHistory"),
+        taskList: document.getElementById("taskList"),
+        taskSummary: document.getElementById("taskSummary"),
+        previewPages: document.getElementById("previewPages"),
+        previewSummary: document.getElementById("previewSummary"),
+        pageCountPill: document.getElementById("pageCountPill"),
+        previewBtn: document.getElementById("previewBtn"),
+        exportBtn: document.getElementById("exportBtn"),
+        clearAllBtn: document.getElementById("clearAllBtn"),
+        imagePicker: document.getElementById("imagePicker"),
+        toast: document.getElementById("toast")
+      };
+
+      function todayInputValue() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function todayThaiValue() {
+        return formatThaiDate(todayInputValue());
+      }
+
+      function todayStorageKey() {
+        return todayInputValue();
+      }
+
+      function parseThaiDate(value) {
+        const clean = String(value || "").trim();
+        const isoMatch = clean.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (isoMatch) {
+          const [, year, month, day] = isoMatch.map(Number);
+          return { day, month, year: year + 543 };
+        }
+
+        const thaiMatch = clean.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+        if (thaiMatch) {
+          let [, day, month, year] = thaiMatch.map(Number);
+          if (year < 2400) year += 543;
+          if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            return { day, month, year };
+          }
+        }
+
+        const [year, month, day] = todayInputValue().split("-").map(Number);
+        return { day, month, year: year + 543 };
+      }
+
+      function formatThaiDate(value) {
+        const parsed = parseThaiDate(value);
+        return `${String(parsed.day).padStart(2, "0")}/${String(parsed.month).padStart(2, "0")}/${parsed.year}`;
+      }
+
+      function uid() {
+        return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      }
+
+      function pairCountForPeople(people) {
+        return Math.max(1, Math.ceil(Number(people || 1) / 2));
+      }
+
+      function clampText(value) {
+        return String(value || "").trim().replace(/\s+/g, " ");
+      }
+
+      function readList(key) {
+        try {
+          const list = JSON.parse(localStorage.getItem(key) || "[]");
+          return Array.isArray(list) ? list.filter(Boolean) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function writeList(key, list) {
+        localStorage.setItem(key, JSON.stringify(list.slice(0, 60)));
+      }
+
+      function rememberValue(key, value) {
+        const clean = clampText(value);
+        if (!clean) return;
+        const next = [clean, ...readList(key).filter((item) => item !== clean)];
+        writeList(key, next);
+      }
+
+      function fillDatalist(datalist, items) {
+        datalist.innerHTML = "";
+        for (const item of items) {
+          const option = document.createElement("option");
+          option.value = item;
+          datalist.appendChild(option);
+        }
+      }
+
+      function refreshHistories() {
+        fillDatalist(el.buildingHistory, readList(BUILDING_KEY));
+        fillDatalist(el.taskHistory, readList(TASK_KEY));
+      }
+
+      function showToast(message) {
+        window.clearTimeout(state.toastTimer);
+        el.toast.textContent = message;
+        el.toast.classList.add("show");
+        state.toastTimer = window.setTimeout(() => {
+          el.toast.classList.remove("show");
+        }, 2600);
+      }
+
+      function saveTextDraft() {
+        const draft = {
+          savedOn: todayStorageKey(),
+          date: el.workDate.value,
+          building: el.buildingInput.value,
+          tasks: state.tasks.map((task) => ({
+            id: task.id,
+            name: task.name,
+            people: task.people
+          }))
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      }
+
+      function loadTextDraft() {
+        try {
+          const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+          if (!draft || draft.savedOn !== todayStorageKey()) return false;
+        if (draft.date) el.workDate.value = formatThaiDate(draft.date);
+          if (draft.building) el.buildingInput.value = draft.building;
+          if (Array.isArray(draft.tasks)) {
+            state.tasks = draft.tasks.map((task) => makeTask(task.name, task.people, task.id));
+          }
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      function makeTask(name, people, id = uid()) {
+        const safePeople = Math.max(1, Math.floor(Number(people) || 1));
+        const pairs = pairCountForPeople(safePeople);
+        return {
+          id,
+          name: clampText(name),
+          people: safePeople,
+          before: Array(pairs).fill(null),
+          after: Array(pairs).fill(null)
+        };
+      }
+
+      function taskPairCount(task) {
+        return task.before.length;
+      }
+
+      function getPages() {
+        const pages = [];
+        let current = { entries: [], pairs: 0 };
+
+        function commit() {
+          if (current.entries.length) {
+            pages.push(current);
+            current = { entries: [], pairs: 0 };
+          }
+        }
+
+        state.tasks.forEach((task, taskIndex) => {
+          let remaining = taskPairCount(task);
+          let startPair = 0;
+
+          while (remaining > 0) {
+            const space = MAX_PAIRS_PER_PAGE - current.pairs;
+            const shouldStartNew =
+              current.pairs > 0 && remaining > space;
+
+            if (shouldStartNew) {
+              commit();
+              continue;
+            }
+
+            const chunk = Math.min(remaining, MAX_PAIRS_PER_PAGE - current.pairs);
+            current.entries.push({ task, taskIndex, startPair, count: chunk });
+            current.pairs += chunk;
+            remaining -= chunk;
+            startPair += chunk;
+
+            if (current.pairs === MAX_PAIRS_PER_PAGE) {
+              commit();
+            }
+          }
+        });
+
+        commit();
+        return pages;
+      }
+
+      function imageCount(list) {
+        return list.filter(Boolean).length;
+      }
+
+      function renderTaskList() {
+        el.taskList.innerHTML = "";
+
+        if (!state.tasks.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "ยังไม่มีรายการงาน";
+          el.taskList.appendChild(empty);
+        }
+
+        state.tasks.forEach((task, index) => {
+          const article = document.createElement("article");
+          article.className = "task-item";
+
+          const head = document.createElement("div");
+          head.className = "task-head";
+          head.innerHTML = `
+            <div class="task-no">${index + 1}</div>
+            <div>
+              <p class="task-name">${escapeHtml(task.name)}</p>
+              <div class="task-meta">
+                <span class="tag">จำนวน ${task.people} คน</span>
+                <span class="tag">${taskPairCount(task)} คู่รูป</span>
+                <span class="tag">Before ${imageCount(task.before)}/${taskPairCount(task)}</span>
+                <span class="tag">After ${imageCount(task.after)}/${taskPairCount(task)}</span>
+              </div>
+            </div>
+          `;
+          article.appendChild(head);
+
+          const actions = document.createElement("div");
+          actions.className = "task-actions";
+          actions.innerHTML = `
+            <button class="before-btn" type="button" data-action="pick" data-side="before" data-id="${task.id}">เพิ่มรูป Before</button>
+            <button class="after-btn" type="button" data-action="pick" data-side="after" data-id="${task.id}">เพิ่มรูป After</button>
+          `;
+          article.appendChild(actions);
+
+          const slotGrid = document.createElement("div");
+          slotGrid.className = "slot-grid";
+
+          for (let slot = 0; slot < taskPairCount(task); slot += 1) {
+            const row = document.createElement("div");
+            row.className = "slot-row";
+            row.appendChild(makeSlotIndex(slot + 1));
+            row.appendChild(makeThumb(task, "before", slot));
+            row.appendChild(makeThumb(task, "after", slot));
+            slotGrid.appendChild(row);
+          }
+
+          article.appendChild(slotGrid);
+
+          const manage = document.createElement("div");
+          manage.className = "task-actions";
+          manage.innerHTML = `
+            <button class="ghost-btn" type="button" data-action="clear-images" data-id="${task.id}">ล้างรูปงานนี้</button>
+            <button class="danger-btn" type="button" data-action="delete" data-id="${task.id}">ลบงาน</button>
+          `;
+          article.appendChild(manage);
+
+          el.taskList.appendChild(article);
+        });
+
+        const totalPairs = state.tasks.reduce((sum, task) => sum + taskPairCount(task), 0);
+        el.taskSummary.textContent = `${state.tasks.length} งาน, ${totalPairs} คู่รูป`;
+      }
+
+      function makeSlotIndex(label) {
+        const node = document.createElement("div");
+        node.className = "slot-index";
+        node.textContent = label;
+        return node;
+      }
+
+      function makeThumb(task, side, index) {
+        const wrap = document.createElement("div");
+        wrap.className = "thumb";
+        const image = task[side][index];
+        const label = side === "before" ? "Before" : "After";
+
+        if (image) {
+          const img = document.createElement("img");
+          img.src = image.url;
+          img.alt = `${label} ${index + 1}`;
+          wrap.appendChild(img);
+
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.dataset.action = "remove-image";
+          remove.dataset.id = task.id;
+          remove.dataset.side = side;
+          remove.dataset.index = String(index);
+          remove.setAttribute("aria-label", `ลบรูป ${label} ช่อง ${index + 1}`);
+          remove.textContent = "×";
+          wrap.appendChild(remove);
+        } else {
+          wrap.textContent = label;
+        }
+
+        return wrap;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      async function renderPreview() {
+        const pages = getPages();
+        el.previewPages.innerHTML = "";
+        el.pageCountPill.textContent = `${pages.length} หน้า`;
+        el.previewSummary.textContent = pages.length ? `${pages.length} หน้า A4` : "ยังไม่มีหน้า";
+        el.exportBtn.disabled = pages.length === 0;
+
+        if (!pages.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "ยังไม่มีตัวอย่าง";
+          el.previewPages.appendChild(empty);
+          return;
+        }
+
+        for (let i = 0; i < pages.length; i += 1) {
+          const pageWrap = document.createElement("div");
+          pageWrap.className = "page-preview";
+
+          const title = document.createElement("div");
+          title.className = "page-preview-title";
+          title.innerHTML = `<span>หน้า ${i + 1}</span><span>${pages[i].pairs} คู่รูป</span>`;
+          pageWrap.appendChild(title);
+
+          const canvas = await renderSheetCanvas(pages[i], i + 1);
+          canvas.className = "sheet";
+          pageWrap.appendChild(canvas);
+          el.previewPages.appendChild(pageWrap);
+        }
+      }
+
+      function sync() {
+        updateThaiDateText();
+        renderTaskList();
+        saveTextDraft();
+        renderPreview();
+      }
+
+      function updateThaiDateText() {
+        el.thaiDateText.textContent = `แสดงบนภาพ: ${formatThaiDate(el.workDate.value)}`;
+      }
+
+      function findTask(id) {
+        return state.tasks.find((task) => task.id === id);
+      }
+
+      function firstEmptySlot(task, side) {
+        return task[side].findIndex((image) => !image);
+      }
+
+      async function loadImageFile(file) {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.decoding = "async";
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+
+        return { url, img, name: file.name };
+      }
+
+      function revokeImage(image) {
+        if (image && image.url) {
+          URL.revokeObjectURL(image.url);
+        }
+      }
+
+      async function addImages(task, side, files) {
+        let accepted = 0;
+        let ignored = 0;
+
+        for (const file of files) {
+          const slot = firstEmptySlot(task, side);
+          if (slot === -1) {
+            ignored += 1;
+            continue;
+          }
+
+          try {
+            task[side][slot] = await loadImageFile(file);
+            accepted += 1;
+          } catch {
+            ignored += 1;
+          }
+        }
+
+        if (accepted && ignored) {
+          showToast(`เพิ่มรูป ${accepted} รูป และข้าม ${ignored} รูป`);
+        } else if (accepted) {
+          showToast(`เพิ่มรูป ${accepted} รูปแล้ว`);
+        } else if (ignored) {
+          showToast("ช่องรูปเต็มแล้ว");
+        }
+      }
+
+      function clearTaskImages(task) {
+        for (const side of ["before", "after"]) {
+          task[side].forEach(revokeImage);
+          task[side] = Array(taskPairCount(task)).fill(null);
+        }
+      }
+
+      function clearAllImages() {
+        state.tasks.forEach(clearTaskImages);
+      }
+
+      function clearAll() {
+        clearAllImages();
+        state.tasks = [];
+        el.buildingInput.value = "";
+        el.taskNameInput.value = "";
+        el.peopleInput.value = "";
+        el.workDate.value = todayThaiValue();
+        localStorage.removeItem(DRAFT_KEY);
+        sync();
+      }
+
+      function drawRoundRect(ctx, x, y, width, height, radius) {
+        const safeRadius = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + safeRadius, y);
+        ctx.lineTo(x + width - safeRadius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+        ctx.lineTo(x + width, y + height - safeRadius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+        ctx.lineTo(x + safeRadius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+        ctx.lineTo(x, y + safeRadius);
+        ctx.quadraticCurveTo(x, y, x + safeRadius, y);
+        ctx.closePath();
+      }
+
+      function fillRoundRect(ctx, x, y, width, height, radius, fill, stroke, lineWidth = 3) {
+        drawRoundRect(ctx, x, y, width, height, radius);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        if (stroke) {
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = lineWidth;
+          ctx.stroke();
+        }
+      }
+
+      function drawCenteredFittedText(ctx, text, x, y, maxWidth, fontSize, minSize, family, weight = "700") {
+        let size = fontSize;
+        do {
+          ctx.font = `${weight} ${size}px ${family}`;
+          if (ctx.measureText(text).width <= maxWidth || size <= minSize) break;
+          size -= 2;
+        } while (size > minSize);
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, x, y);
+      }
+
+      function drawImageCover(ctx, image, x, y, width, height) {
+        const img = image.img;
+        const sourceRatio = img.naturalWidth / img.naturalHeight;
+        const targetRatio = width / height;
+        let sx = 0;
+        let sy = 0;
+        let sw = img.naturalWidth;
+        let sh = img.naturalHeight;
+
+        if (sourceRatio > targetRatio) {
+          sw = img.naturalHeight * targetRatio;
+          sx = (img.naturalWidth - sw) / 2;
+        } else {
+          sh = img.naturalWidth / targetRatio;
+          sy = (img.naturalHeight - sh) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sw, sh, x, y, width, height);
+      }
+
+      function drawPlaceholder(ctx, x, y, width, height) {
+        const gradient = ctx.createLinearGradient(0, y, 0, y + height);
+        gradient.addColorStop(0, "#e7f5fb");
+        gradient.addColorStop(1, "#f8fbfd");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, width, height);
+
+        ctx.fillStyle = "#dcecd0";
+        ctx.beginPath();
+        ctx.moveTo(x, y + height * 0.70);
+        ctx.bezierCurveTo(x + width * 0.22, y + height * 0.55, x + width * 0.32, y + height * 0.80, x + width * 0.52, y + height * 0.66);
+        ctx.bezierCurveTo(x + width * 0.68, y + height * 0.55, x + width * 0.80, y + height * 0.75, x + width, y + height * 0.62);
+        ctx.lineTo(x + width, y + height);
+        ctx.lineTo(x, y + height);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#87a700";
+        ctx.beginPath();
+        ctx.moveTo(x, y + height * 0.78);
+        ctx.bezierCurveTo(x + width * 0.20, y + height * 0.64, x + width * 0.35, y + height * 0.90, x + width * 0.58, y + height * 0.74);
+        ctx.bezierCurveTo(x + width * 0.74, y + height * 0.62, x + width * 0.86, y + height * 0.86, x + width, y + height * 0.70);
+        ctx.lineTo(x + width, y + height);
+        ctx.lineTo(x, y + height);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,0.86)";
+        ctx.beginPath();
+        ctx.arc(x + width * 0.50, y + height * 0.24, 30, Math.PI, 0);
+        ctx.arc(x + width * 0.57, y + height * 0.24, 24, Math.PI, 0);
+        ctx.arc(x + width * 0.42, y + height * 0.25, 18, Math.PI, 0);
+        ctx.rect(x + width * 0.37, y + height * 0.24, width * 0.28, 30);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(30,40,42,0.18)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
+      }
+
+      async function renderSheetCanvas(page, pageNumber) {
+        const canvas = document.createElement("canvas");
+        canvas.width = A4.width;
+        canvas.height = A4.height;
+        const ctx = canvas.getContext("2d");
+        const thaiFamily = "'Leelawadee UI', 'Noto Sans Thai', Tahoma, sans-serif";
+        const labelFamily = "Georgia, 'Times New Roman', serif";
+        const dateText = formatThaiDate(el.workDate.value);
+        const buildingText = clampText(el.buildingInput.value) || "อาคาร";
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, A4.width, A4.height);
+
+        ctx.fillStyle = "#101010";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.font = `500 38px ${thaiFamily}`;
+        ctx.fillText(dateText, 70, 78);
+
+        fillRoundRect(ctx, 492, 28, 256, 94, 16, "#9ee9df", "rgba(0,0,0,0.10)", 2);
+        ctx.fillStyle = "#050505";
+        drawCenteredFittedText(ctx, buildingText, A4.width / 2, 75, 220, 48, 28, thaiFamily, "900");
+
+        fillRoundRect(ctx, 168, 148, 292, 102, 12, "#36b2eb", "#121212", 4);
+        ctx.fillStyle = "#050505";
+        drawCenteredFittedText(ctx, "BEFORE", 314, 200, 250, 58, 44, labelFamily, "900");
+
+        fillRoundRect(ctx, 780, 148, 292, 102, 12, "#ffe26c", "#333333", 4);
+        ctx.fillStyle = "#050505";
+        drawCenteredFittedText(ctx, "AFTER", 926, 200, 250, 58, 44, labelFamily, "900");
+
+        const leftX = 70;
+        const rightX = 682;
+        const imageW = 488;
+        const imageH = 330;
+        const rowTop = 315;
+        const rowStep = 445;
+        let row = 0;
+
+        for (const entry of page.entries) {
+          const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}  จำนวน  ${entry.task.people}  คน`;
+          ctx.fillStyle = "#111111";
+          drawCenteredFittedText(ctx, taskText, A4.width / 2, rowTop + row * rowStep + 30, 980, 40, 25, thaiFamily, "700");
+
+          for (let offset = 0; offset < entry.count; offset += 1) {
+            const pairIndex = entry.startPair + offset;
+            const imageY = rowTop + row * rowStep + 80;
+            drawImageBox(ctx, entry.task.before[pairIndex], leftX, imageY, imageW, imageH);
+            drawImageBox(ctx, entry.task.after[pairIndex], rightX, imageY, imageW, imageH);
+            row += 1;
+          }
+        }
+
+        return canvas;
+      }
+
+      function drawImageBox(ctx, image, x, y, width, height) {
+        if (image) {
+          drawImageCover(ctx, image, x, y, width, height);
+        } else {
+          drawPlaceholder(ctx, x, y, width, height);
+        }
+      }
+
+      function sanitizeFileName(value) {
+        return clampText(value)
+          .replace(/[\\/:*?"<>|]/g, "-")
+          .replace(/\s+/g, "-")
+          .slice(0, 80) || "Before-After";
+      }
+
+      async function downloadCanvas(canvas, name) {
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!blob) throw new Error("ไม่สามารถสร้างไฟล์ PNG ได้");
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+      }
+
+      function delay(ms) {
+        return new Promise((resolve) => window.setTimeout(resolve, ms));
+      }
+
+      async function exportPngPages() {
+        const pages = getPages();
+        if (!pages.length) {
+          showToast("ยังไม่มีหน้าสำหรับดาวน์โหลด");
+          return;
+        }
+
+        rememberValue(BUILDING_KEY, el.buildingInput.value);
+        refreshHistories();
+
+        el.exportBtn.disabled = true;
+        el.exportBtn.textContent = "กำลังสร้าง...";
+
+        try {
+          const date = formatThaiDate(el.workDate.value).replaceAll("/", "-");
+          const building = sanitizeFileName(el.buildingInput.value || "อาคาร");
+
+          for (let i = 0; i < pages.length; i += 1) {
+            const canvas = await renderSheetCanvas(pages[i], i + 1);
+            await downloadCanvas(canvas, `Before-After_${building}_${date}_หน้า-${i + 1}.png`);
+            await delay(160);
+          }
+
+          showToast(`ดาวน์โหลด PNG ${pages.length} หน้าแล้ว`);
+        } catch (error) {
+          showToast(error.message || "ดาวน์โหลดไม่สำเร็จ");
+        } finally {
+          el.exportBtn.textContent = "ดาวน์โหลด PNG";
+          el.exportBtn.disabled = pages.length === 0;
+        }
+      }
+
+      el.taskForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const name = clampText(el.taskNameInput.value);
+        const people = Math.floor(Number(el.peopleInput.value));
+
+        if (!name) {
+          showToast("กรอกชื่องานก่อน");
+          el.taskNameInput.focus();
+          return;
+        }
+
+        if (!people || people < 1) {
+          showToast("กรอกจำนวนคนอย่างน้อย 1 คน");
+          el.peopleInput.focus();
+          return;
+        }
+
+        state.tasks.push(makeTask(name, people));
+        rememberValue(TASK_KEY, name);
+        rememberValue(BUILDING_KEY, el.buildingInput.value);
+        refreshHistories();
+        el.taskNameInput.value = "";
+        el.peopleInput.value = "";
+        el.taskNameInput.focus();
+        sync();
+      });
+
+      el.taskList.addEventListener("click", async (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+
+        const { action, id, side, index } = button.dataset;
+        const task = findTask(id);
+        if (!task) return;
+
+        if (action === "pick") {
+          state.pickTarget = { taskId: id, side };
+          el.imagePicker.value = "";
+          el.imagePicker.click();
+          return;
+        }
+
+        if (action === "remove-image") {
+          const slot = Number(index);
+          revokeImage(task[side][slot]);
+          task[side][slot] = null;
+          sync();
+          return;
+        }
+
+        if (action === "clear-images") {
+          clearTaskImages(task);
+          sync();
+          showToast("ล้างรูปงานนี้แล้ว");
+          return;
+        }
+
+        if (action === "delete") {
+          clearTaskImages(task);
+          state.tasks = state.tasks.filter((item) => item.id !== id);
+          sync();
+          showToast("ลบงานแล้ว");
+        }
+      });
+
+      el.imagePicker.addEventListener("change", async () => {
+        const target = state.pickTarget;
+        const files = Array.from(el.imagePicker.files || []);
+        state.pickTarget = null;
+
+        if (!target || !files.length) return;
+        const task = findTask(target.taskId);
+        if (!task) return;
+
+        await addImages(task, target.side, files);
+        sync();
+      });
+
+      el.workDate.addEventListener("change", () => {
+        el.workDate.value = formatThaiDate(el.workDate.value);
+        sync();
+      });
+      el.workDate.addEventListener("blur", () => {
+        el.workDate.value = formatThaiDate(el.workDate.value);
+        sync();
+      });
+      el.buildingInput.addEventListener("input", () => {
+        updateThaiDateText();
+        saveTextDraft();
+        renderPreview();
+      });
+      el.buildingInput.addEventListener("blur", () => {
+        rememberValue(BUILDING_KEY, el.buildingInput.value);
+        refreshHistories();
+      });
+
+      el.previewBtn.addEventListener("click", async () => {
+        await renderPreview();
+        document.getElementById("previewTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+
+      el.exportBtn.addEventListener("click", exportPngPages);
+
+      el.clearAllBtn.addEventListener("click", () => {
+        clearAll();
+        showToast("ล้างข้อมูลบนหน้าจอแล้ว");
+      });
+
+      el.workDate.value = todayThaiValue();
+      refreshHistories();
+      loadTextDraft();
+      sync();
+    })();
+  </script>
+</body>
+</html>
