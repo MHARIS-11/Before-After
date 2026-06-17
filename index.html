@@ -714,9 +714,10 @@
               <label for="templateSelect">เทมเพลตภาพ A4</label>
               <select id="templateSelect">
                 <option value="classic">Classic เดิม, 3 คู่/หน้า</option>
-                <option value="clean">Clean Report, 4 คู่/หน้า</option>
+                <option value="clean">Clean Grid, 4 คู่/หน้า</option>
                 <option value="photo">Photo Focus, 2 คู่/หน้า</option>
                 <option value="compact">Compact Site, 6 คู่/หน้า</option>
+                <option value="luxury">Luxury, 6 คู่/หน้า</option>
               </select>
               <p class="template-note" id="templateDescription">แบบเดิมตามตัวอย่าง เหมาะกับงานทั่วไป</p>
             </div>
@@ -822,9 +823,9 @@
           description: "แบบเดิมตามตัวอย่าง เหมาะกับงานทั่วไป"
         },
         clean: {
-          label: "Clean Report",
+          label: "Clean Grid",
           pairsPerPage: 4,
-          description: "เอกสารสะอาด อ่านเป็นทางการขึ้น ใส่ได้ 4 คู่ต่อหน้า"
+          description: "กริดสะอาด อ่านง่ายขึ้น ใส่ได้ 4 คู่ต่อหน้า"
         },
         photo: {
           label: "Photo Focus",
@@ -835,6 +836,11 @@
           label: "Compact Site",
           pairsPerPage: 6,
           description: "รวมรูปได้เยอะที่สุด เหมาะกับงานหลายคู่ในวันเดียว"
+        },
+        luxury: {
+          label: "Luxury",
+          pairsPerPage: 6,
+          description: "โทนพรีเมียม ดำทอง อ่านง่าย ใส่ได้ 6 คู่ต่อหน้า"
         }
       };
 
@@ -1192,46 +1198,34 @@
 
       function getPages() {
         const pages = [];
-        let current = { entries: [], pairs: 0 };
         const building = activeBuilding();
         const tasks = building ? building.tasks : [];
         const template = activeTemplate();
         const maxPairs = template.pairsPerPage;
 
-        function commit() {
-          if (current.entries.length) {
-            pages.push(current);
-            current = { entries: [], pairs: 0 };
-          }
-        }
+        const pairItems = [];
+        let itemIndex = 1;
+        tasks.forEach((task) => {
+          let remainingPeople = Math.max(0, Math.floor(Number(task.people) || 0));
 
-        tasks.forEach((task, taskIndex) => {
-          let remaining = taskPairCount(task);
-          let startPair = 0;
-
-          while (remaining > 0) {
-            const space = maxPairs - current.pairs;
-            const shouldStartNew =
-              current.pairs > 0 && remaining > space;
-
-            if (shouldStartNew) {
-              commit();
-              continue;
-            }
-
-            const chunk = Math.min(remaining, maxPairs - current.pairs);
-            current.entries.push({ task, taskIndex, startPair, count: chunk });
-            current.pairs += chunk;
-            remaining -= chunk;
-            startPair += chunk;
-
-            if (current.pairs === maxPairs) {
-              commit();
-            }
+          for (let pairIndex = 0; pairIndex < taskPairCount(task); pairIndex += 1) {
+            const people = Math.max(1, Math.min(2, remainingPeople || 1));
+            pairItems.push({
+              task,
+              pairIndex,
+              people,
+              itemIndex
+            });
+            remainingPeople -= people;
+            itemIndex += 1;
           }
         });
 
-        commit();
+        for (let index = 0; index < pairItems.length; index += maxPairs) {
+          const items = pairItems.slice(index, index + maxPairs);
+          pages.push({ items, pairs: items.length });
+        }
+
         return pages;
       }
 
@@ -1653,11 +1647,21 @@
           renderPhotoSheet(ctx, page, meta);
         } else if (templateKey === "compact") {
           renderCompactSheet(ctx, page, meta);
+        } else if (templateKey === "luxury") {
+          renderLuxurySheet(ctx, page, meta);
         } else {
           renderClassicSheet(ctx, page, meta);
         }
 
         return canvas;
+      }
+
+      function pairFullTitle(item) {
+        return `${item.itemIndex}.) ${item.task.name}  จำนวน  ${item.people}  คน`;
+      }
+
+      function pairShortTitle(item) {
+        return `${item.itemIndex}.) ${item.task.name}`;
       }
 
       function renderClassicSheet(ctx, page, meta) {
@@ -1690,72 +1694,76 @@
         const rowStep = 445;
         let row = 0;
 
-        for (const entry of page.entries) {
-          const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}  จำนวน  ${entry.task.people}  คน`;
+        for (const item of page.items) {
+          const taskText = pairFullTitle(item);
           ctx.fillStyle = "#111111";
           drawCenteredFittedText(ctx, taskText, A4.width / 2, rowTop + row * rowStep + 30, 980, 40, 25, meta.thaiFamily, "700");
 
-          for (let offset = 0; offset < entry.count; offset += 1) {
-            const pairIndex = entry.startPair + offset;
-            const imageY = rowTop + row * rowStep + 80;
-            drawImageBox(ctx, entry.task.before[pairIndex], leftX, imageY, imageW, imageH);
-            drawImageBox(ctx, entry.task.after[pairIndex], rightX, imageY, imageW, imageH);
-            row += 1;
-          }
+          const imageY = rowTop + row * rowStep + 80;
+          drawImageBox(ctx, item.task.before[item.pairIndex], leftX, imageY, imageW, imageH);
+          drawImageBox(ctx, item.task.after[item.pairIndex], rightX, imageY, imageW, imageH);
+          row += 1;
         }
       }
 
       function renderCleanSheet(ctx, page, meta) {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, A4.width, A4.height);
-        ctx.fillStyle = "#f3f7f5";
-        ctx.fillRect(0, 0, A4.width, 190);
-        ctx.fillStyle = "#18342f";
-        ctx.fillRect(0, 182, A4.width, 8);
+        ctx.fillStyle = "#f8faf9";
+        ctx.fillRect(0, 0, A4.width, 178);
+        ctx.fillStyle = "#111827";
+        ctx.fillRect(0, 176, A4.width, 3);
 
-        ctx.fillStyle = "#17211f";
-        ctx.font = `800 42px ${meta.thaiFamily}`;
+        ctx.fillStyle = "#111827";
+        ctx.font = `800 40px ${meta.thaiFamily}`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText("Before-After", 70, 64);
-        ctx.font = `600 30px ${meta.thaiFamily}`;
-        ctx.fillText(meta.dateText, 70, 116);
+        ctx.fillText(meta.buildingText, 70, 62);
+        ctx.font = `600 28px ${meta.thaiFamily}`;
+        ctx.fillText(meta.dateText, 70, 112);
 
-        fillRoundRect(ctx, 820, 44, 350, 82, 10, "#ffffff", "#cbd8d2", 2);
-        ctx.fillStyle = "#111a18";
-        drawCenteredFittedText(ctx, meta.buildingText, 995, 85, 300, 42, 26, meta.thaiFamily, "900");
+        ctx.textAlign = "right";
+        ctx.font = `800 30px ${meta.labelFamily}`;
+        ctx.fillText("BEFORE / AFTER", A4.width - 70, 88);
 
-        ctx.fillStyle = "#2f9bc7";
-        ctx.fillRect(70, 212, 530, 12);
-        ctx.fillStyle = "#b99400";
-        ctx.fillRect(640, 212, 530, 12);
-        ctx.fillStyle = "#111111";
-        drawCenteredFittedText(ctx, "BEFORE", 335, 254, 480, 34, 28, meta.labelFamily, "900");
-        drawCenteredFittedText(ctx, "AFTER", 905, 254, 480, 34, 28, meta.labelFamily, "900");
+        const cardW = 540;
+        const cardH = 640;
+        const gap = 50;
+        const startX = 70;
+        const startY = 235;
+        const rowStep = 700;
+        const imageGap = 22;
+        const imageW = (cardW - imageGap) / 2;
+        const imageH = 420;
+        let slot = 0;
 
-        const leftX = 70;
-        const rightX = 640;
-        const imageW = 530;
-        const imageH = 245;
-        const rowTop = 292;
-        const rowStep = 350;
-        let row = 0;
+        for (const item of page.items) {
+          const col = slot % 2;
+          const row = Math.floor(slot / 2);
+          const x = startX + col * (cardW + gap);
+          const y = startY + row * rowStep;
 
-        for (const entry of page.entries) {
-          for (let offset = 0; offset < entry.count; offset += 1) {
-            const pairIndex = entry.startPair + offset;
-            const y = rowTop + row * rowStep;
-            const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}  จำนวน  ${entry.task.people}  คน`;
-            ctx.fillStyle = "#141414";
-            drawCenteredFittedText(ctx, taskText, A4.width / 2, y, 1020, 32, 23, meta.thaiFamily, "800");
-            drawImageBox(ctx, entry.task.before[pairIndex], leftX, y + 42, imageW, imageH);
-            drawImageBox(ctx, entry.task.after[pairIndex], rightX, y + 42, imageW, imageH);
-            ctx.strokeStyle = "#d7dfda";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(leftX, y + 42, imageW, imageH);
-            ctx.strokeRect(rightX, y + 42, imageW, imageH);
-            row += 1;
-          }
+          fillRoundRect(ctx, x, y, cardW, cardH, 8, "#ffffff", "#d8dee6", 2);
+          ctx.fillStyle = "#111827";
+          drawCenteredFittedText(ctx, pairShortTitle(item), x + cardW / 2, y + 38, cardW - 36, 30, 19, meta.thaiFamily, "800");
+          ctx.fillStyle = "#4b5563";
+          drawCenteredFittedText(ctx, `จำนวน ${item.people} คน`, x + cardW / 2, y + 76, cardW - 36, 22, 16, meta.thaiFamily, "700");
+
+          ctx.fillStyle = "#1b8fc0";
+          ctx.fillRect(x + 18, y + 110, imageW, 28);
+          ctx.fillStyle = "#b98a00";
+          ctx.fillRect(x + 18 + imageW + imageGap, y + 110, imageW, 28);
+          ctx.fillStyle = "#ffffff";
+          drawCenteredFittedText(ctx, "BEFORE", x + 18 + imageW / 2, y + 124, imageW - 12, 18, 14, meta.labelFamily, "900");
+          drawCenteredFittedText(ctx, "AFTER", x + 18 + imageW + imageGap + imageW / 2, y + 124, imageW - 12, 18, 14, meta.labelFamily, "900");
+
+          drawImageBox(ctx, item.task.before[item.pairIndex], x + 18, y + 146, imageW, imageH);
+          drawImageBox(ctx, item.task.after[item.pairIndex], x + 18 + imageW + imageGap, y + 146, imageW, imageH);
+          ctx.strokeStyle = "#e5e7eb";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 18, y + 146, imageW, imageH);
+          ctx.strokeRect(x + 18 + imageW + imageGap, y + 146, imageW, imageH);
+          slot += 1;
         }
       }
 
@@ -1788,17 +1796,13 @@
         const rowStep = 650;
         let row = 0;
 
-        for (const entry of page.entries) {
-          for (let offset = 0; offset < entry.count; offset += 1) {
-            const pairIndex = entry.startPair + offset;
-            const y = rowTop + row * rowStep;
-            const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}  จำนวน  ${entry.task.people}  คน`;
-            ctx.fillStyle = "#111111";
-            drawCenteredFittedText(ctx, taskText, A4.width / 2, y, 1070, 36, 25, meta.thaiFamily, "800");
-            drawImageBox(ctx, entry.task.before[pairIndex], leftX, y + 58, imageW, imageH);
-            drawImageBox(ctx, entry.task.after[pairIndex], rightX, y + 58, imageW, imageH);
-            row += 1;
-          }
+        for (const item of page.items) {
+          const y = rowTop + row * rowStep;
+          ctx.fillStyle = "#111111";
+          drawCenteredFittedText(ctx, pairFullTitle(item), A4.width / 2, y, 1070, 36, 25, meta.thaiFamily, "800");
+          drawImageBox(ctx, item.task.before[item.pairIndex], leftX, y + 58, imageW, imageH);
+          drawImageBox(ctx, item.task.after[item.pairIndex], rightX, y + 58, imageW, imageH);
+          row += 1;
         }
       }
 
@@ -1829,35 +1833,95 @@
         const imageH = 240;
         let slot = 0;
 
-        for (const entry of page.entries) {
-          for (let offset = 0; offset < entry.count; offset += 1) {
-            const pairIndex = entry.startPair + offset;
-            const col = slot % 2;
-            const row = Math.floor(slot / 2);
-            const x = startX + col * (cardW + gap);
-            const y = startY + row * rowStep;
-            const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}`;
+        for (const item of page.items) {
+          const col = slot % 2;
+          const row = Math.floor(slot / 2);
+          const x = startX + col * (cardW + gap);
+          const y = startY + row * rowStep;
 
-            fillRoundRect(ctx, x, y, cardW, cardH, 8, "#f8faf8", "#d8e0da", 2);
-            ctx.fillStyle = "#111111";
-            drawCenteredFittedText(ctx, taskText, x + cardW / 2, y + 34, cardW - 34, 28, 19, meta.thaiFamily, "800");
-            ctx.font = `700 20px ${meta.thaiFamily}`;
-            ctx.fillStyle = "#33433e";
-            ctx.textAlign = "center";
-            ctx.fillText(`จำนวน ${entry.task.people} คน`, x + cardW / 2, y + 70);
+          fillRoundRect(ctx, x, y, cardW, cardH, 8, "#f8faf8", "#d8e0da", 2);
+          ctx.fillStyle = "#111111";
+          drawCenteredFittedText(ctx, pairShortTitle(item), x + cardW / 2, y + 34, cardW - 34, 28, 19, meta.thaiFamily, "800");
+          ctx.font = `700 20px ${meta.thaiFamily}`;
+          ctx.fillStyle = "#33433e";
+          ctx.textAlign = "center";
+          ctx.fillText(`จำนวน ${item.people} คน`, x + cardW / 2, y + 70);
 
-            ctx.fillStyle = "#1c8cb8";
-            ctx.fillRect(x, y + 92, imageW, 28);
-            ctx.fillStyle = "#9a7a00";
-            ctx.fillRect(x + imageW + imageGap, y + 92, imageW, 28);
-            ctx.fillStyle = "#ffffff";
-            drawCenteredFittedText(ctx, "BEFORE", x + imageW / 2, y + 106, imageW - 12, 18, 14, meta.labelFamily, "900");
-            drawCenteredFittedText(ctx, "AFTER", x + imageW + imageGap + imageW / 2, y + 106, imageW - 12, 18, 14, meta.labelFamily, "900");
+          ctx.fillStyle = "#1c8cb8";
+          ctx.fillRect(x, y + 92, imageW, 28);
+          ctx.fillStyle = "#9a7a00";
+          ctx.fillRect(x + imageW + imageGap, y + 92, imageW, 28);
+          ctx.fillStyle = "#ffffff";
+          drawCenteredFittedText(ctx, "BEFORE", x + imageW / 2, y + 106, imageW - 12, 18, 14, meta.labelFamily, "900");
+          drawCenteredFittedText(ctx, "AFTER", x + imageW + imageGap + imageW / 2, y + 106, imageW - 12, 18, 14, meta.labelFamily, "900");
 
-            drawImageBox(ctx, entry.task.before[pairIndex], x, y + 124, imageW, imageH);
-            drawImageBox(ctx, entry.task.after[pairIndex], x + imageW + imageGap, y + 124, imageW, imageH);
-            slot += 1;
-          }
+          drawImageBox(ctx, item.task.before[item.pairIndex], x, y + 124, imageW, imageH);
+          drawImageBox(ctx, item.task.after[item.pairIndex], x + imageW + imageGap, y + 124, imageW, imageH);
+          slot += 1;
+        }
+      }
+
+      function renderLuxurySheet(ctx, page, meta) {
+        ctx.fillStyle = "#fbfaf7";
+        ctx.fillRect(0, 0, A4.width, A4.height);
+        ctx.fillStyle = "#141414";
+        ctx.fillRect(0, 0, A4.width, 168);
+        ctx.fillStyle = "#c5a64a";
+        ctx.fillRect(0, 166, A4.width, 6);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `800 38px ${meta.thaiFamily}`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(meta.buildingText, 54, 58);
+        ctx.font = `600 27px ${meta.thaiFamily}`;
+        ctx.fillStyle = "#e8dcc0";
+        ctx.fillText(meta.dateText, 54, 104);
+
+        ctx.textAlign = "right";
+        ctx.font = `800 30px ${meta.labelFamily}`;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("BEFORE / AFTER", A4.width - 54, 82);
+
+        const cardW = 555;
+        const cardH = 390;
+        const gap = 30;
+        const startX = 50;
+        const startY = 220;
+        const rowStep = 465;
+        const imageGap = 16;
+        const imageW = (cardW - imageGap) / 2;
+        const imageH = 240;
+        let slot = 0;
+
+        for (const item of page.items) {
+          const col = slot % 2;
+          const row = Math.floor(slot / 2);
+          const x = startX + col * (cardW + gap);
+          const y = startY + row * rowStep;
+
+          fillRoundRect(ctx, x, y, cardW, cardH, 8, "#ffffff", "#c9ad55", 2);
+          ctx.fillStyle = "#141414";
+          ctx.fillRect(x, y, cardW, 82);
+          ctx.fillStyle = "#d6bb63";
+          ctx.fillRect(x, y + 80, cardW, 4);
+
+          ctx.fillStyle = "#ffffff";
+          drawCenteredFittedText(ctx, pairShortTitle(item), x + cardW / 2, y + 32, cardW - 34, 26, 18, meta.thaiFamily, "800");
+          ctx.fillStyle = "#d6bb63";
+          drawCenteredFittedText(ctx, `จำนวน ${item.people} คน`, x + cardW / 2, y + 62, cardW - 34, 20, 15, meta.thaiFamily, "700");
+
+          ctx.fillStyle = "#1f7fa6";
+          ctx.fillRect(x, y + 104, imageW, 28);
+          ctx.fillStyle = "#b49228";
+          ctx.fillRect(x + imageW + imageGap, y + 104, imageW, 28);
+          ctx.fillStyle = "#ffffff";
+          drawCenteredFittedText(ctx, "BEFORE", x + imageW / 2, y + 118, imageW - 12, 18, 14, meta.labelFamily, "900");
+          drawCenteredFittedText(ctx, "AFTER", x + imageW + imageGap + imageW / 2, y + 118, imageW - 12, 18, 14, meta.labelFamily, "900");
+
+          drawImageBox(ctx, item.task.before[item.pairIndex], x, y + 136, imageW, imageH);
+          drawImageBox(ctx, item.task.after[item.pairIndex], x + imageW + imageGap, y + 136, imageW, imageH);
+          slot += 1;
         }
       }
 
