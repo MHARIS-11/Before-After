@@ -399,6 +399,94 @@
       gap: 14px;
     }
 
+    .hidden {
+      display: none !important;
+    }
+
+    .back-btn {
+      min-width: 46px;
+      padding: 0 12px;
+      background: var(--surface-strong);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-weight: 900;
+    }
+
+    .home-view {
+      display: grid;
+      gap: 14px;
+    }
+
+    .building-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 120px;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .building-form .field {
+      min-width: 0;
+    }
+
+    .building-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .building-card {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .building-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .building-name {
+      margin: 0;
+      font-size: 1.04rem;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .building-actions {
+      display: grid;
+      grid-template-columns: 1fr 92px;
+      gap: 8px;
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .report-output {
+      width: 100%;
+      min-height: 132px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg);
+      color: var(--ink);
+      padding: 10px 12px;
+      font: inherit;
+      line-height: 1.55;
+    }
+
+    .report-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
     .preview-toolbar {
       display: flex;
       align-items: center;
@@ -505,6 +593,11 @@
         align-items: start;
       }
 
+      .home-view {
+        grid-template-columns: 410px minmax(0, 1fr);
+        align-items: start;
+      }
+
       .sticky-stack {
         position: sticky;
         top: 16px;
@@ -518,6 +611,10 @@
 
       .preview-pages {
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .report-actions {
+        grid-template-columns: 1fr 1fr;
       }
 
       .toast {
@@ -540,14 +637,40 @@
 <body>
   <div class="app">
     <header class="topbar">
+      <button class="back-btn hidden" type="button" id="backHomeBtn" aria-label="กลับหน้า Home">←</button>
       <div class="brand">
-        <h1>Before-After</h1>
-        <p>จัดรูปงานรายวันเป็นภาพ A4 พร้อมส่งต่อ</p>
+        <h1 id="appTitle">Before-After</h1>
+        <p id="appSubtitle">จัดรูปงานรายวันเป็นภาพ A4 พร้อมส่งต่อ</p>
       </div>
       <span class="status-pill" id="pageCountPill">0 หน้า</span>
     </header>
 
-    <main class="layout">
+    <main class="home-view" id="homeView">
+      <section class="panel" aria-labelledby="homeTitle">
+        <div class="panel-title">
+          <h2 id="homeTitle">Home</h2>
+        </div>
+
+        <form class="building-form" id="buildingForm">
+          <div class="field">
+            <label for="homeBuildingInput">เพิ่มอาคาร</label>
+            <input id="homeBuildingInput" list="buildingHistory" autocomplete="off" placeholder="เช่น อาคาร G">
+            <datalist id="buildingHistory"></datalist>
+          </div>
+          <button class="primary-btn" type="submit">เพิ่ม</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="buildingListTitle">
+        <div class="panel-title">
+          <h2 id="buildingListTitle">อาคารทั้งหมด</h2>
+          <span class="metric" id="buildingSummary">0 อาคาร</span>
+        </div>
+        <div class="building-list" id="buildingList"></div>
+      </section>
+    </main>
+
+    <main class="layout hidden" id="workspaceView">
       <div class="sticky-stack">
         <section class="panel" aria-labelledby="setupTitle">
           <div class="panel-title">
@@ -564,7 +687,34 @@
             <div class="field">
               <label for="buildingInput">ชื่ออาคาร</label>
               <input id="buildingInput" list="buildingHistory" autocomplete="off" placeholder="เช่น อาคาร G">
-              <datalist id="buildingHistory"></datalist>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="morningReportTitle">
+          <div class="panel-title">
+            <h2 id="morningReportTitle">รายงานเช้า</h2>
+          </div>
+
+          <div class="grid">
+            <div class="report-grid">
+              <div class="field">
+                <label for="totalWorkersInput">คนงานทั้งหมด</label>
+                <input id="totalWorkersInput" type="number" inputmode="numeric" min="0" step="1" placeholder="12">
+              </div>
+              <div class="field">
+                <label for="activeWorkersInput">ลงงาน</label>
+                <input id="activeWorkersInput" type="number" inputmode="numeric" min="0" step="1" placeholder="6">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="reportText">ข้อความที่จะคัดลอก</label>
+              <textarea class="report-output" id="reportText" readonly></textarea>
+            </div>
+
+            <div class="report-actions">
+              <button class="primary-btn" type="button" id="copyReportBtn">คัดลอกรายงานเช้า</button>
             </div>
           </div>
         </section>
@@ -603,17 +753,17 @@
       <section class="panel preview-panel" aria-labelledby="previewTitle">
         <div class="preview-toolbar">
           <div>
-            <h2 id="previewTitle">ตัวอย่าง A4</h2>
+          <h2 id="previewTitle">ตัวอย่าง A4</h2>
             <div class="metric" id="previewSummary">ยังไม่มีหน้า</div>
           </div>
-          <button class="ghost-btn" type="button" id="clearAllBtn">ล้างทั้งหมด</button>
+          <button class="ghost-btn" type="button" id="clearAllBtn">ล้างอาคารนี้</button>
         </div>
         <div class="preview-pages" id="previewPages"></div>
       </section>
     </main>
   </div>
 
-  <div class="bottom-bar">
+  <div class="bottom-bar hidden" id="bottomBar">
     <div class="bottom-inner">
       <button class="secondary-btn" type="button" id="previewBtn">ดูตัวอย่าง</button>
       <button class="primary-btn" type="button" id="exportBtn">ดาวน์โหลด PNG</button>
@@ -629,21 +779,37 @@
 
       const A4 = { width: 1240, height: 1754 };
       const MAX_PAIRS_PER_PAGE = 3;
-      const BUILDING_KEY = "beforeAfter.buildings.v1";
+      const BUILDING_HISTORY_KEY = "beforeAfter.buildings.v1";
       const TASK_KEY = "beforeAfter.tasks.v1";
-      const DRAFT_KEY = "beforeAfter.textDraft.v1";
+      const DRAFT_KEY = "beforeAfter.multiBuildingDraft.v1";
+      const LEGACY_DRAFT_KEY = "beforeAfter.textDraft.v1";
 
       const state = {
-        tasks: [],
+        buildings: [],
+        activeBuildingId: null,
         pickTarget: null,
         toastTimer: null
       };
 
       const el = {
+        homeView: document.getElementById("homeView"),
+        workspaceView: document.getElementById("workspaceView"),
+        bottomBar: document.getElementById("bottomBar"),
+        backHomeBtn: document.getElementById("backHomeBtn"),
+        appTitle: document.getElementById("appTitle"),
+        appSubtitle: document.getElementById("appSubtitle"),
+        buildingForm: document.getElementById("buildingForm"),
+        homeBuildingInput: document.getElementById("homeBuildingInput"),
+        buildingList: document.getElementById("buildingList"),
+        buildingSummary: document.getElementById("buildingSummary"),
         workDate: document.getElementById("workDate"),
         thaiDateText: document.getElementById("thaiDateText"),
         buildingInput: document.getElementById("buildingInput"),
         buildingHistory: document.getElementById("buildingHistory"),
+        totalWorkersInput: document.getElementById("totalWorkersInput"),
+        activeWorkersInput: document.getElementById("activeWorkersInput"),
+        reportText: document.getElementById("reportText"),
+        copyReportBtn: document.getElementById("copyReportBtn"),
         taskForm: document.getElementById("taskForm"),
         taskNameInput: document.getElementById("taskNameInput"),
         peopleInput: document.getElementById("peopleInput"),
@@ -684,9 +850,10 @@
           return { day, month, year: year + 543 };
         }
 
-        const thaiMatch = clean.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+        const thaiMatch = clean.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/);
         if (thaiMatch) {
           let [, day, month, year] = thaiMatch.map(Number);
+          if (year < 100) year += 2500;
           if (year < 2400) year += 543;
           if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
             return { day, month, year };
@@ -700,6 +867,11 @@
       function formatThaiDate(value) {
         const parsed = parseThaiDate(value);
         return `${String(parsed.day).padStart(2, "0")}/${String(parsed.month).padStart(2, "0")}/${parsed.year}`;
+      }
+
+      function formatThaiDateShort(value) {
+        const parsed = parseThaiDate(value);
+        return `${String(parsed.day).padStart(2, "0")}/${String(parsed.month).padStart(2, "0")}/${String(parsed.year % 100).padStart(2, "0")}`;
       }
 
       function uid() {
@@ -744,7 +916,7 @@
       }
 
       function refreshHistories() {
-        fillDatalist(el.buildingHistory, readList(BUILDING_KEY));
+        fillDatalist(el.buildingHistory, readList(BUILDING_HISTORY_KEY));
         fillDatalist(el.taskHistory, readList(TASK_KEY));
       }
 
@@ -760,12 +932,14 @@
       function saveTextDraft() {
         const draft = {
           savedOn: todayStorageKey(),
-          date: el.workDate.value,
-          building: el.buildingInput.value,
-          tasks: state.tasks.map((task) => ({
-            id: task.id,
-            name: task.name,
-            people: task.people
+          activeBuildingId: state.activeBuildingId,
+          buildings: state.buildings.map((building) => ({
+            id: building.id,
+            name: building.name,
+            date: building.date,
+            totalWorkers: building.totalWorkers,
+            activeWorkers: building.activeWorkers,
+            tasks: building.tasks.map(serializeTask)
           }))
         };
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -774,16 +948,58 @@
       function loadTextDraft() {
         try {
           const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-          if (!draft || draft.savedOn !== todayStorageKey()) return false;
-        if (draft.date) el.workDate.value = formatThaiDate(draft.date);
-          if (draft.building) el.buildingInput.value = draft.building;
-          if (Array.isArray(draft.tasks)) {
-            state.tasks = draft.tasks.map((task) => makeTask(task.name, task.people, task.id));
+          if (draft && draft.savedOn === todayStorageKey() && Array.isArray(draft.buildings)) {
+            state.buildings = draft.buildings.map(restoreBuilding);
+            state.activeBuildingId = null;
+            return true;
           }
-          return true;
+
+          const legacy = JSON.parse(localStorage.getItem(LEGACY_DRAFT_KEY) || "null");
+          if (legacy && legacy.savedOn === todayStorageKey() && (legacy.building || Array.isArray(legacy.tasks))) {
+            const building = makeBuilding(legacy.building || "อาคาร");
+            building.date = formatThaiDate(legacy.date || todayThaiValue());
+            building.tasks = Array.isArray(legacy.tasks)
+              ? legacy.tasks.map((task) => makeTask(task.name, task.people, task.id))
+              : [];
+            state.buildings = [building];
+            state.activeBuildingId = null;
+            return true;
+          }
+
+          return false;
         } catch {
           return false;
         }
+      }
+
+      function serializeTask(task) {
+        return {
+          id: task.id,
+          name: task.name,
+          people: task.people
+        };
+      }
+
+      function restoreBuilding(saved) {
+        const building = makeBuilding(saved.name || "อาคาร", saved.id || uid());
+        building.date = formatThaiDate(saved.date || todayThaiValue());
+        building.totalWorkers = saved.totalWorkers || "";
+        building.activeWorkers = saved.activeWorkers || "";
+        building.tasks = Array.isArray(saved.tasks)
+          ? saved.tasks.map((task) => makeTask(task.name, task.people, task.id))
+          : [];
+        return building;
+      }
+
+      function makeBuilding(name, id = uid()) {
+        return {
+          id,
+          name: clampText(name) || `อาคาร ${state.buildings.length + 1}`,
+          date: todayThaiValue(),
+          totalWorkers: "",
+          activeWorkers: "",
+          tasks: []
+        };
       }
 
       function makeTask(name, people, id = uid()) {
@@ -802,9 +1018,106 @@
         return task.before.length;
       }
 
+      function activeBuilding() {
+        return state.buildings.find((building) => building.id === state.activeBuildingId) || null;
+      }
+
+      function loadBuildingToForm(building) {
+        el.workDate.value = formatThaiDate(building.date || todayThaiValue());
+        el.buildingInput.value = building.name || "";
+        el.totalWorkersInput.value = building.totalWorkers || "";
+        el.activeWorkersInput.value = building.activeWorkers || "";
+      }
+
+      function pullFormToBuilding() {
+        const building = activeBuilding();
+        if (!building) return null;
+        building.date = formatThaiDate(el.workDate.value || building.date || todayThaiValue());
+        building.name = clampText(el.buildingInput.value) || building.name || "อาคาร";
+        building.totalWorkers = el.totalWorkersInput.value;
+        building.activeWorkers = el.activeWorkersInput.value;
+        return building;
+      }
+
+      function setActiveBuilding(id) {
+        const building = state.buildings.find((item) => item.id === id);
+        if (!building) return;
+        state.activeBuildingId = building.id;
+        loadBuildingToForm(building);
+        renderShell();
+        sync({ skipPull: true });
+      }
+
+      function goHome() {
+        pullFormToBuilding();
+        state.activeBuildingId = null;
+        renderShell();
+        saveTextDraft();
+      }
+
+      function renderShell() {
+        const building = activeBuilding();
+        const isHome = !building;
+        el.homeView.classList.toggle("hidden", !isHome);
+        el.workspaceView.classList.toggle("hidden", isHome);
+        el.bottomBar.classList.toggle("hidden", isHome);
+        el.backHomeBtn.classList.toggle("hidden", isHome);
+
+        if (isHome) {
+          el.appTitle.textContent = "Before-After";
+          el.appSubtitle.textContent = "เลือกอาคารที่ต้องส่งงาน";
+          el.pageCountPill.textContent = `${state.buildings.length} อาคาร`;
+          renderHome();
+        } else {
+          el.appTitle.textContent = building.name || "อาคาร";
+          el.appSubtitle.textContent = "เพิ่มงาน ใส่รูป และสร้างรายงาน";
+        }
+      }
+
+      function renderHome() {
+        el.buildingSummary.textContent = `${state.buildings.length} อาคาร`;
+        el.buildingList.innerHTML = "";
+
+        if (!state.buildings.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "ยังไม่มีอาคาร กรอกชื่อแล้วกดเพิ่ม";
+          el.buildingList.appendChild(empty);
+          return;
+        }
+
+        state.buildings.forEach((building) => {
+          const totalPairs = building.tasks.reduce((sum, task) => sum + taskPairCount(task), 0);
+          const beforeCount = building.tasks.reduce((sum, task) => sum + imageCount(task.before), 0);
+          const afterCount = building.tasks.reduce((sum, task) => sum + imageCount(task.after), 0);
+          const card = document.createElement("article");
+          card.className = "building-card";
+          card.innerHTML = `
+            <div class="building-card-head">
+              <div>
+                <p class="building-name">${escapeHtml(building.name)}</p>
+                <div class="task-meta">
+                  <span class="tag">${building.tasks.length} งาน</span>
+                  <span class="tag">${totalPairs} คู่รูป</span>
+                  <span class="tag">Before ${beforeCount}/${totalPairs}</span>
+                  <span class="tag">After ${afterCount}/${totalPairs}</span>
+                </div>
+              </div>
+            </div>
+            <div class="building-actions">
+              <button class="primary-btn" type="button" data-action="open-building" data-id="${building.id}">เปิดอาคาร</button>
+              <button class="danger-btn" type="button" data-action="delete-building" data-id="${building.id}">ลบ</button>
+            </div>
+          `;
+          el.buildingList.appendChild(card);
+        });
+      }
+
       function getPages() {
         const pages = [];
         let current = { entries: [], pairs: 0 };
+        const building = activeBuilding();
+        const tasks = building ? building.tasks : [];
 
         function commit() {
           if (current.entries.length) {
@@ -813,7 +1126,7 @@
           }
         }
 
-        state.tasks.forEach((task, taskIndex) => {
+        tasks.forEach((task, taskIndex) => {
           let remaining = taskPairCount(task);
           let startPair = 0;
 
@@ -848,16 +1161,18 @@
       }
 
       function renderTaskList() {
+        const building = activeBuilding();
+        const tasks = building ? building.tasks : [];
         el.taskList.innerHTML = "";
 
-        if (!state.tasks.length) {
+        if (!tasks.length) {
           const empty = document.createElement("div");
           empty.className = "empty-state";
           empty.textContent = "ยังไม่มีรายการงาน";
           el.taskList.appendChild(empty);
         }
 
-        state.tasks.forEach((task, index) => {
+        tasks.forEach((task, index) => {
           const article = document.createElement("article");
           article.className = "task-item";
 
@@ -910,8 +1225,8 @@
           el.taskList.appendChild(article);
         });
 
-        const totalPairs = state.tasks.reduce((sum, task) => sum + taskPairCount(task), 0);
-        el.taskSummary.textContent = `${state.tasks.length} งาน, ${totalPairs} คู่รูป`;
+        const totalPairs = tasks.reduce((sum, task) => sum + taskPairCount(task), 0);
+        el.taskSummary.textContent = `${tasks.length} งาน, ${totalPairs} คู่รูป`;
       }
 
       function makeSlotIndex(label) {
@@ -989,9 +1304,16 @@
         }
       }
 
-      function sync() {
+      function sync(options = {}) {
+        const building = options.skipPull ? activeBuilding() : pullFormToBuilding();
+        renderShell();
+        if (!building) {
+          saveTextDraft();
+          return;
+        }
         updateThaiDateText();
         renderTaskList();
+        renderReportPreview();
         saveTextDraft();
         renderPreview();
       }
@@ -1001,7 +1323,49 @@
       }
 
       function findTask(id) {
-        return state.tasks.find((task) => task.id === id);
+        for (const building of state.buildings) {
+          const task = building.tasks.find((item) => item.id === id);
+          if (task) return task;
+        }
+        return null;
+      }
+
+      function buildMorningReport() {
+        const building = activeBuilding();
+        if (!building) return "";
+        const total = Math.max(0, Math.floor(Number(building.totalWorkers) || 0));
+        const active = Math.max(0, Math.floor(Number(building.activeWorkers) || 0));
+        const taskLines = building.tasks.map((task, index) => `${index + 1}. ${task.name}`);
+        return [
+          formatThaiDateShort(building.date || el.workDate.value),
+          `✅ คนงานทั้งหมด ${total}คน`,
+          `✳️ ลงงาน ${active} คน`,
+          ...taskLines
+        ].join("\n");
+      }
+
+      function renderReportPreview() {
+        el.reportText.value = buildMorningReport();
+      }
+
+      async function copyReport() {
+        pullFormToBuilding();
+        renderReportPreview();
+        const text = el.reportText.value;
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            el.reportText.removeAttribute("readonly");
+            el.reportText.select();
+            document.execCommand("copy");
+            el.reportText.setAttribute("readonly", "readonly");
+            window.getSelection()?.removeAllRanges();
+          }
+          showToast("คัดลอกรายงานเช้าแล้ว");
+        } catch {
+          showToast("คัดลอกไม่สำเร็จ กดเลือกข้อความเองได้");
+        }
       }
 
       function firstEmptySlot(task, side) {
@@ -1063,18 +1427,27 @@
         }
       }
 
+      function revokeBuildingImages(building) {
+        building.tasks.forEach(clearTaskImages);
+      }
+
       function clearAllImages() {
-        state.tasks.forEach(clearTaskImages);
+        const building = activeBuilding();
+        if (!building) return;
+        building.tasks.forEach(clearTaskImages);
       }
 
       function clearAll() {
+        const building = activeBuilding();
+        if (!building) return;
         clearAllImages();
-        state.tasks = [];
-        el.buildingInput.value = "";
+        building.tasks = [];
+        building.totalWorkers = "";
+        building.activeWorkers = "";
         el.taskNameInput.value = "";
         el.peopleInput.value = "";
-        el.workDate.value = todayThaiValue();
-        localStorage.removeItem(DRAFT_KEY);
+        el.totalWorkersInput.value = "";
+        el.activeWorkersInput.value = "";
         sync();
       }
 
@@ -1182,10 +1555,11 @@
         canvas.width = A4.width;
         canvas.height = A4.height;
         const ctx = canvas.getContext("2d");
+        const building = activeBuilding();
         const thaiFamily = "'Leelawadee UI', 'Noto Sans Thai', Tahoma, sans-serif";
         const labelFamily = "Georgia, 'Times New Roman', serif";
-        const dateText = formatThaiDate(el.workDate.value);
-        const buildingText = clampText(el.buildingInput.value) || "อาคาร";
+        const dateText = formatThaiDate(building?.date || el.workDate.value);
+        const buildingText = clampText(building?.name || el.buildingInput.value) || "อาคาร";
 
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, A4.width, A4.height);
@@ -1266,21 +1640,22 @@
       }
 
       async function exportPngPages() {
+        const buildingData = pullFormToBuilding();
         const pages = getPages();
         if (!pages.length) {
           showToast("ยังไม่มีหน้าสำหรับดาวน์โหลด");
           return;
         }
 
-        rememberValue(BUILDING_KEY, el.buildingInput.value);
+        rememberValue(BUILDING_HISTORY_KEY, buildingData?.name || el.buildingInput.value);
         refreshHistories();
 
         el.exportBtn.disabled = true;
         el.exportBtn.textContent = "กำลังสร้าง...";
 
         try {
-          const date = formatThaiDate(el.workDate.value).replaceAll("/", "-");
-          const building = sanitizeFileName(el.buildingInput.value || "อาคาร");
+          const date = formatThaiDate(buildingData?.date || el.workDate.value).replaceAll("/", "-");
+          const building = sanitizeFileName(buildingData?.name || el.buildingInput.value || "อาคาร");
 
           for (let i = 0; i < pages.length; i += 1) {
             const canvas = await renderSheetCanvas(pages[i], i + 1);
@@ -1299,6 +1674,12 @@
 
       el.taskForm.addEventListener("submit", (event) => {
         event.preventDefault();
+        const building = activeBuilding();
+        if (!building) {
+          showToast("เลือกอาคารก่อนเพิ่มงาน");
+          return;
+        }
+
         const name = clampText(el.taskNameInput.value);
         const people = Math.floor(Number(el.peopleInput.value));
 
@@ -1314,9 +1695,9 @@
           return;
         }
 
-        state.tasks.push(makeTask(name, people));
+        building.tasks.push(makeTask(name, people));
         rememberValue(TASK_KEY, name);
-        rememberValue(BUILDING_KEY, el.buildingInput.value);
+        rememberValue(BUILDING_HISTORY_KEY, building.name);
         refreshHistories();
         el.taskNameInput.value = "";
         el.peopleInput.value = "";
@@ -1355,8 +1736,10 @@
         }
 
         if (action === "delete") {
+          const building = activeBuilding();
+          if (!building) return;
           clearTaskImages(task);
-          state.tasks = state.tasks.filter((item) => item.id !== id);
+          building.tasks = building.tasks.filter((item) => item.id !== id);
           sync();
           showToast("ลบงานแล้ว");
         }
@@ -1375,6 +1758,48 @@
         sync();
       });
 
+      el.buildingForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const name = clampText(el.homeBuildingInput.value);
+        if (!name) {
+          showToast("กรอกชื่ออาคารก่อน");
+          el.homeBuildingInput.focus();
+          return;
+        }
+
+        const building = makeBuilding(name);
+        state.buildings.push(building);
+        rememberValue(BUILDING_HISTORY_KEY, name);
+        refreshHistories();
+        el.homeBuildingInput.value = "";
+        setActiveBuilding(building.id);
+        showToast("เพิ่มอาคารแล้ว");
+      });
+
+      el.buildingList.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+
+        const { action, id } = button.dataset;
+        if (action === "open-building") {
+          setActiveBuilding(id);
+          return;
+        }
+
+        if (action === "delete-building") {
+          const building = state.buildings.find((item) => item.id === id);
+          if (!building) return;
+          revokeBuildingImages(building);
+          state.buildings = state.buildings.filter((item) => item.id !== id);
+          if (state.activeBuildingId === id) state.activeBuildingId = null;
+          renderShell();
+          saveTextDraft();
+          showToast("ลบอาคารแล้ว");
+        }
+      });
+
+      el.backHomeBtn.addEventListener("click", goHome);
+
       el.workDate.addEventListener("change", () => {
         el.workDate.value = formatThaiDate(el.workDate.value);
         sync();
@@ -1384,14 +1809,22 @@
         sync();
       });
       el.buildingInput.addEventListener("input", () => {
-        updateThaiDateText();
+        const building = pullFormToBuilding();
+        if (building) {
+          el.appTitle.textContent = building.name || "อาคาร";
+        }
         saveTextDraft();
         renderPreview();
       });
       el.buildingInput.addEventListener("blur", () => {
-        rememberValue(BUILDING_KEY, el.buildingInput.value);
+        rememberValue(BUILDING_HISTORY_KEY, el.buildingInput.value);
         refreshHistories();
+        sync();
       });
+
+      el.totalWorkersInput.addEventListener("input", sync);
+      el.activeWorkersInput.addEventListener("input", sync);
+      el.copyReportBtn.addEventListener("click", copyReport);
 
       el.previewBtn.addEventListener("click", async () => {
         await renderPreview();
@@ -1402,13 +1835,17 @@
 
       el.clearAllBtn.addEventListener("click", () => {
         clearAll();
-        showToast("ล้างข้อมูลบนหน้าจอแล้ว");
+        showToast("ล้างข้อมูลอาคารนี้แล้ว");
       });
 
-      el.workDate.value = todayThaiValue();
       refreshHistories();
       loadTextDraft();
-      sync();
+      if (state.activeBuildingId) {
+        const building = activeBuilding();
+        if (building) loadBuildingToForm(building);
+      }
+      renderShell();
+      sync({ skipPull: true });
     })();
   </script>
 </body>
