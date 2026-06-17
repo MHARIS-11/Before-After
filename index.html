@@ -175,7 +175,8 @@
       font-size: 0.86rem;
     }
 
-    input {
+    input,
+    select {
       width: 100%;
       min-height: var(--control);
       border: 1px solid var(--line);
@@ -183,6 +184,19 @@
       background: var(--bg);
       color: var(--ink);
       padding: 10px 12px;
+    }
+
+    select {
+      appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position:
+        calc(100% - 18px) 50%,
+        calc(100% - 12px) 50%;
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 36px;
     }
 
     input::placeholder {
@@ -487,6 +501,13 @@
       gap: 8px;
     }
 
+    .template-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 700;
+    }
+
     .preview-toolbar {
       display: flex;
       align-items: center;
@@ -688,6 +709,17 @@
               <label for="buildingInput">ชื่ออาคาร</label>
               <input id="buildingInput" list="buildingHistory" autocomplete="off" placeholder="เช่น อาคาร G">
             </div>
+
+            <div class="field">
+              <label for="templateSelect">เทมเพลตภาพ A4</label>
+              <select id="templateSelect">
+                <option value="classic">Classic เดิม, 3 คู่/หน้า</option>
+                <option value="clean">Clean Report, 4 คู่/หน้า</option>
+                <option value="photo">Photo Focus, 2 คู่/หน้า</option>
+                <option value="compact">Compact Site, 6 คู่/หน้า</option>
+              </select>
+              <p class="template-note" id="templateDescription">แบบเดิมตามตัวอย่าง เหมาะกับงานทั่วไป</p>
+            </div>
           </div>
         </section>
 
@@ -778,11 +810,33 @@
       "use strict";
 
       const A4 = { width: 1240, height: 1754 };
-      const MAX_PAIRS_PER_PAGE = 3;
       const BUILDING_HISTORY_KEY = "beforeAfter.buildings.v1";
       const TASK_KEY = "beforeAfter.tasks.v1";
       const DRAFT_KEY = "beforeAfter.multiBuildingDraft.v1";
       const LEGACY_DRAFT_KEY = "beforeAfter.textDraft.v1";
+      const DEFAULT_TEMPLATE = "classic";
+      const TEMPLATE_DEFS = {
+        classic: {
+          label: "Classic",
+          pairsPerPage: 3,
+          description: "แบบเดิมตามตัวอย่าง เหมาะกับงานทั่วไป"
+        },
+        clean: {
+          label: "Clean Report",
+          pairsPerPage: 4,
+          description: "เอกสารสะอาด อ่านเป็นทางการขึ้น ใส่ได้ 4 คู่ต่อหน้า"
+        },
+        photo: {
+          label: "Photo Focus",
+          pairsPerPage: 2,
+          description: "รูปใหญ่ที่สุด เหมาะกับวันที่ต้องให้เห็นรายละเอียดชัด"
+        },
+        compact: {
+          label: "Compact Site",
+          pairsPerPage: 6,
+          description: "รวมรูปได้เยอะที่สุด เหมาะกับงานหลายคู่ในวันเดียว"
+        }
+      };
 
       const state = {
         buildings: [],
@@ -806,6 +860,8 @@
         thaiDateText: document.getElementById("thaiDateText"),
         buildingInput: document.getElementById("buildingInput"),
         buildingHistory: document.getElementById("buildingHistory"),
+        templateSelect: document.getElementById("templateSelect"),
+        templateDescription: document.getElementById("templateDescription"),
         totalWorkersInput: document.getElementById("totalWorkersInput"),
         activeWorkersInput: document.getElementById("activeWorkersInput"),
         reportText: document.getElementById("reportText"),
@@ -937,6 +993,7 @@
             id: building.id,
             name: building.name,
             date: building.date,
+            template: building.template,
             totalWorkers: building.totalWorkers,
             activeWorkers: building.activeWorkers,
             tasks: building.tasks.map(serializeTask)
@@ -983,6 +1040,7 @@
       function restoreBuilding(saved) {
         const building = makeBuilding(saved.name || "อาคาร", saved.id || uid());
         building.date = formatThaiDate(saved.date || todayThaiValue());
+        building.template = TEMPLATE_DEFS[saved.template] ? saved.template : DEFAULT_TEMPLATE;
         building.totalWorkers = saved.totalWorkers || "";
         building.activeWorkers = saved.activeWorkers || "";
         building.tasks = Array.isArray(saved.tasks)
@@ -996,6 +1054,7 @@
           id,
           name: clampText(name) || `อาคาร ${state.buildings.length + 1}`,
           date: todayThaiValue(),
+          template: DEFAULT_TEMPLATE,
           totalWorkers: "",
           activeWorkers: "",
           tasks: []
@@ -1022,11 +1081,27 @@
         return state.buildings.find((building) => building.id === state.activeBuildingId) || null;
       }
 
+      function activeTemplateKey() {
+        const building = activeBuilding();
+        return TEMPLATE_DEFS[building?.template] ? building.template : DEFAULT_TEMPLATE;
+      }
+
+      function activeTemplate() {
+        return TEMPLATE_DEFS[activeTemplateKey()];
+      }
+
+      function updateTemplateDescription() {
+        const template = TEMPLATE_DEFS[el.templateSelect.value] || TEMPLATE_DEFS[DEFAULT_TEMPLATE];
+        el.templateDescription.textContent = template.description;
+      }
+
       function loadBuildingToForm(building) {
         el.workDate.value = formatThaiDate(building.date || todayThaiValue());
         el.buildingInput.value = building.name || "";
+        el.templateSelect.value = TEMPLATE_DEFS[building.template] ? building.template : DEFAULT_TEMPLATE;
         el.totalWorkersInput.value = building.totalWorkers || "";
         el.activeWorkersInput.value = building.activeWorkers || "";
+        updateTemplateDescription();
       }
 
       function pullFormToBuilding() {
@@ -1034,6 +1109,7 @@
         if (!building) return null;
         building.date = formatThaiDate(el.workDate.value || building.date || todayThaiValue());
         building.name = clampText(el.buildingInput.value) || building.name || "อาคาร";
+        building.template = TEMPLATE_DEFS[el.templateSelect.value] ? el.templateSelect.value : DEFAULT_TEMPLATE;
         building.totalWorkers = el.totalWorkersInput.value;
         building.activeWorkers = el.activeWorkersInput.value;
         return building;
@@ -1097,10 +1173,11 @@
               <div>
                 <p class="building-name">${escapeHtml(building.name)}</p>
                 <div class="task-meta">
-                  <span class="tag">${building.tasks.length} งาน</span>
-                  <span class="tag">${totalPairs} คู่รูป</span>
-                  <span class="tag">Before ${beforeCount}/${totalPairs}</span>
-                  <span class="tag">After ${afterCount}/${totalPairs}</span>
+                <span class="tag">${building.tasks.length} งาน</span>
+                <span class="tag">${totalPairs} คู่รูป</span>
+                <span class="tag">${TEMPLATE_DEFS[building.template]?.label || TEMPLATE_DEFS[DEFAULT_TEMPLATE].label}</span>
+                <span class="tag">Before ${beforeCount}/${totalPairs}</span>
+                <span class="tag">After ${afterCount}/${totalPairs}</span>
                 </div>
               </div>
             </div>
@@ -1118,6 +1195,8 @@
         let current = { entries: [], pairs: 0 };
         const building = activeBuilding();
         const tasks = building ? building.tasks : [];
+        const template = activeTemplate();
+        const maxPairs = template.pairsPerPage;
 
         function commit() {
           if (current.entries.length) {
@@ -1131,7 +1210,7 @@
           let startPair = 0;
 
           while (remaining > 0) {
-            const space = MAX_PAIRS_PER_PAGE - current.pairs;
+            const space = maxPairs - current.pairs;
             const shouldStartNew =
               current.pairs > 0 && remaining > space;
 
@@ -1140,13 +1219,13 @@
               continue;
             }
 
-            const chunk = Math.min(remaining, MAX_PAIRS_PER_PAGE - current.pairs);
+            const chunk = Math.min(remaining, maxPairs - current.pairs);
             current.entries.push({ task, taskIndex, startPair, count: chunk });
             current.pairs += chunk;
             remaining -= chunk;
             startPair += chunk;
 
-            if (current.pairs === MAX_PAIRS_PER_PAGE) {
+            if (current.pairs === maxPairs) {
               commit();
             }
           }
@@ -1275,9 +1354,10 @@
 
       async function renderPreview() {
         const pages = getPages();
+        const template = activeTemplate();
         el.previewPages.innerHTML = "";
         el.pageCountPill.textContent = `${pages.length} หน้า`;
-        el.previewSummary.textContent = pages.length ? `${pages.length} หน้า A4` : "ยังไม่มีหน้า";
+        el.previewSummary.textContent = pages.length ? `${pages.length} หน้า A4, ${template.label}` : "ยังไม่มีหน้า";
         el.exportBtn.disabled = pages.length === 0;
 
         if (!pages.length) {
@@ -1294,7 +1374,7 @@
 
           const title = document.createElement("div");
           title.className = "page-preview-title";
-          title.innerHTML = `<span>หน้า ${i + 1}</span><span>${pages[i].pairs} คู่รูป</span>`;
+          title.innerHTML = `<span>หน้า ${i + 1}</span><span>${pages[i].pairs} คู่รูป · ${template.label}</span>`;
           pageWrap.appendChild(title);
 
           const canvas = await renderSheetCanvas(pages[i], i + 1);
@@ -1558,29 +1638,49 @@
         const building = activeBuilding();
         const thaiFamily = "'Leelawadee UI', 'Noto Sans Thai', Tahoma, sans-serif";
         const labelFamily = "Georgia, 'Times New Roman', serif";
-        const dateText = formatThaiDate(building?.date || el.workDate.value);
-        const buildingText = clampText(building?.name || el.buildingInput.value) || "อาคาร";
+        const meta = {
+          building,
+          thaiFamily,
+          labelFamily,
+          dateText: formatThaiDate(building?.date || el.workDate.value),
+          buildingText: clampText(building?.name || el.buildingInput.value) || "อาคาร"
+        };
 
+        const templateKey = activeTemplateKey();
+        if (templateKey === "clean") {
+          renderCleanSheet(ctx, page, meta);
+        } else if (templateKey === "photo") {
+          renderPhotoSheet(ctx, page, meta);
+        } else if (templateKey === "compact") {
+          renderCompactSheet(ctx, page, meta);
+        } else {
+          renderClassicSheet(ctx, page, meta);
+        }
+
+        return canvas;
+      }
+
+      function renderClassicSheet(ctx, page, meta) {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, A4.width, A4.height);
 
         ctx.fillStyle = "#101010";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.font = `500 38px ${thaiFamily}`;
-        ctx.fillText(dateText, 70, 78);
+        ctx.font = `500 38px ${meta.thaiFamily}`;
+        ctx.fillText(meta.dateText, 70, 78);
 
         fillRoundRect(ctx, 492, 28, 256, 94, 16, "#9ee9df", "rgba(0,0,0,0.10)", 2);
         ctx.fillStyle = "#050505";
-        drawCenteredFittedText(ctx, buildingText, A4.width / 2, 75, 220, 48, 28, thaiFamily, "900");
+        drawCenteredFittedText(ctx, meta.buildingText, A4.width / 2, 75, 220, 48, 28, meta.thaiFamily, "900");
 
         fillRoundRect(ctx, 168, 148, 292, 102, 12, "#36b2eb", "#121212", 4);
         ctx.fillStyle = "#050505";
-        drawCenteredFittedText(ctx, "BEFORE", 314, 200, 250, 58, 44, labelFamily, "900");
+        drawCenteredFittedText(ctx, "BEFORE", 314, 200, 250, 58, 44, meta.labelFamily, "900");
 
         fillRoundRect(ctx, 780, 148, 292, 102, 12, "#ffe26c", "#333333", 4);
         ctx.fillStyle = "#050505";
-        drawCenteredFittedText(ctx, "AFTER", 926, 200, 250, 58, 44, labelFamily, "900");
+        drawCenteredFittedText(ctx, "AFTER", 926, 200, 250, 58, 44, meta.labelFamily, "900");
 
         const leftX = 70;
         const rightX = 682;
@@ -1593,7 +1693,7 @@
         for (const entry of page.entries) {
           const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}  จำนวน  ${entry.task.people}  คน`;
           ctx.fillStyle = "#111111";
-          drawCenteredFittedText(ctx, taskText, A4.width / 2, rowTop + row * rowStep + 30, 980, 40, 25, thaiFamily, "700");
+          drawCenteredFittedText(ctx, taskText, A4.width / 2, rowTop + row * rowStep + 30, 980, 40, 25, meta.thaiFamily, "700");
 
           for (let offset = 0; offset < entry.count; offset += 1) {
             const pairIndex = entry.startPair + offset;
@@ -1603,8 +1703,162 @@
             row += 1;
           }
         }
+      }
 
-        return canvas;
+      function renderCleanSheet(ctx, page, meta) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, A4.width, A4.height);
+        ctx.fillStyle = "#f3f7f5";
+        ctx.fillRect(0, 0, A4.width, 190);
+        ctx.fillStyle = "#18342f";
+        ctx.fillRect(0, 182, A4.width, 8);
+
+        ctx.fillStyle = "#17211f";
+        ctx.font = `800 42px ${meta.thaiFamily}`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Before-After", 70, 64);
+        ctx.font = `600 30px ${meta.thaiFamily}`;
+        ctx.fillText(meta.dateText, 70, 116);
+
+        fillRoundRect(ctx, 820, 44, 350, 82, 10, "#ffffff", "#cbd8d2", 2);
+        ctx.fillStyle = "#111a18";
+        drawCenteredFittedText(ctx, meta.buildingText, 995, 85, 300, 42, 26, meta.thaiFamily, "900");
+
+        ctx.fillStyle = "#2f9bc7";
+        ctx.fillRect(70, 212, 530, 12);
+        ctx.fillStyle = "#b99400";
+        ctx.fillRect(640, 212, 530, 12);
+        ctx.fillStyle = "#111111";
+        drawCenteredFittedText(ctx, "BEFORE", 335, 254, 480, 34, 28, meta.labelFamily, "900");
+        drawCenteredFittedText(ctx, "AFTER", 905, 254, 480, 34, 28, meta.labelFamily, "900");
+
+        const leftX = 70;
+        const rightX = 640;
+        const imageW = 530;
+        const imageH = 245;
+        const rowTop = 292;
+        const rowStep = 350;
+        let row = 0;
+
+        for (const entry of page.entries) {
+          for (let offset = 0; offset < entry.count; offset += 1) {
+            const pairIndex = entry.startPair + offset;
+            const y = rowTop + row * rowStep;
+            const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}  จำนวน  ${entry.task.people}  คน`;
+            ctx.fillStyle = "#141414";
+            drawCenteredFittedText(ctx, taskText, A4.width / 2, y, 1020, 32, 23, meta.thaiFamily, "800");
+            drawImageBox(ctx, entry.task.before[pairIndex], leftX, y + 42, imageW, imageH);
+            drawImageBox(ctx, entry.task.after[pairIndex], rightX, y + 42, imageW, imageH);
+            ctx.strokeStyle = "#d7dfda";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(leftX, y + 42, imageW, imageH);
+            ctx.strokeRect(rightX, y + 42, imageW, imageH);
+            row += 1;
+          }
+        }
+      }
+
+      function renderPhotoSheet(ctx, page, meta) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, A4.width, A4.height);
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(0, 0, A4.width, 126);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `800 40px ${meta.thaiFamily}`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(meta.buildingText, 56, 52);
+        ctx.font = `600 28px ${meta.thaiFamily}`;
+        ctx.fillText(meta.dateText, 56, 92);
+
+        ctx.fillStyle = "#36b2eb";
+        ctx.fillRect(55, 168, 540, 12);
+        ctx.fillStyle = "#f2c94c";
+        ctx.fillRect(645, 168, 540, 12);
+        ctx.fillStyle = "#101010";
+        drawCenteredFittedText(ctx, "BEFORE", 325, 216, 500, 36, 28, meta.labelFamily, "900");
+        drawCenteredFittedText(ctx, "AFTER", 915, 216, 500, 36, 28, meta.labelFamily, "900");
+
+        const leftX = 55;
+        const rightX = 645;
+        const imageW = 540;
+        const imageH = 500;
+        const rowTop = 275;
+        const rowStep = 650;
+        let row = 0;
+
+        for (const entry of page.entries) {
+          for (let offset = 0; offset < entry.count; offset += 1) {
+            const pairIndex = entry.startPair + offset;
+            const y = rowTop + row * rowStep;
+            const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}  จำนวน  ${entry.task.people}  คน`;
+            ctx.fillStyle = "#111111";
+            drawCenteredFittedText(ctx, taskText, A4.width / 2, y, 1070, 36, 25, meta.thaiFamily, "800");
+            drawImageBox(ctx, entry.task.before[pairIndex], leftX, y + 58, imageW, imageH);
+            drawImageBox(ctx, entry.task.after[pairIndex], rightX, y + 58, imageW, imageH);
+            row += 1;
+          }
+        }
+      }
+
+      function renderCompactSheet(ctx, page, meta) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, A4.width, A4.height);
+        ctx.fillStyle = "#15211e";
+        ctx.fillRect(0, 0, A4.width, 160);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `800 38px ${meta.thaiFamily}`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(meta.buildingText, 54, 58);
+        ctx.font = `600 27px ${meta.thaiFamily}`;
+        ctx.fillText(meta.dateText, 54, 104);
+        ctx.textAlign = "right";
+        ctx.font = `800 30px ${meta.labelFamily}`;
+        ctx.fillText("BEFORE / AFTER", A4.width - 54, 82);
+
+        const cardW = 555;
+        const cardH = 390;
+        const gap = 30;
+        const startX = 50;
+        const startY = 220;
+        const rowStep = 465;
+        const imageGap = 16;
+        const imageW = (cardW - imageGap) / 2;
+        const imageH = 240;
+        let slot = 0;
+
+        for (const entry of page.entries) {
+          for (let offset = 0; offset < entry.count; offset += 1) {
+            const pairIndex = entry.startPair + offset;
+            const col = slot % 2;
+            const row = Math.floor(slot / 2);
+            const x = startX + col * (cardW + gap);
+            const y = startY + row * rowStep;
+            const taskText = `${entry.taskIndex + 1}.) ${entry.task.name}`;
+
+            fillRoundRect(ctx, x, y, cardW, cardH, 8, "#f8faf8", "#d8e0da", 2);
+            ctx.fillStyle = "#111111";
+            drawCenteredFittedText(ctx, taskText, x + cardW / 2, y + 34, cardW - 34, 28, 19, meta.thaiFamily, "800");
+            ctx.font = `700 20px ${meta.thaiFamily}`;
+            ctx.fillStyle = "#33433e";
+            ctx.textAlign = "center";
+            ctx.fillText(`จำนวน ${entry.task.people} คน`, x + cardW / 2, y + 70);
+
+            ctx.fillStyle = "#1c8cb8";
+            ctx.fillRect(x, y + 92, imageW, 28);
+            ctx.fillStyle = "#9a7a00";
+            ctx.fillRect(x + imageW + imageGap, y + 92, imageW, 28);
+            ctx.fillStyle = "#ffffff";
+            drawCenteredFittedText(ctx, "BEFORE", x + imageW / 2, y + 106, imageW - 12, 18, 14, meta.labelFamily, "900");
+            drawCenteredFittedText(ctx, "AFTER", x + imageW + imageGap + imageW / 2, y + 106, imageW - 12, 18, 14, meta.labelFamily, "900");
+
+            drawImageBox(ctx, entry.task.before[pairIndex], x, y + 124, imageW, imageH);
+            drawImageBox(ctx, entry.task.after[pairIndex], x + imageW + imageGap, y + 124, imageW, imageH);
+            slot += 1;
+          }
+        }
       }
 
       function drawImageBox(ctx, image, x, y, width, height) {
@@ -1820,6 +2074,12 @@
         rememberValue(BUILDING_HISTORY_KEY, el.buildingInput.value);
         refreshHistories();
         sync();
+      });
+
+      el.templateSelect.addEventListener("change", () => {
+        updateTemplateDescription();
+        sync();
+        showToast(`ใช้เทมเพลต ${activeTemplate().label}`);
       });
 
       el.totalWorkersInput.addEventListener("input", sync);
