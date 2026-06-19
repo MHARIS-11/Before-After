@@ -717,6 +717,7 @@
                 <option value="photo">Photo Focus, 2 คู่/หน้า</option>
                 <option value="compact">Compact Site, 6 คู่/หน้า</option>
                 <option value="luxury">Luxury, 6 คู่/หน้า</option>
+                <option value="yokgong">ยกกอง, จุงานเยอะ</option>
               </select>
               <p class="template-note" id="templateDescription">แบบเดิมตามตัวอย่าง เหมาะกับงานทั่วไป</p>
             </div>
@@ -839,6 +840,11 @@
           label: "Luxury",
           pairsPerPage: 6,
           description: "โทนพรีเมียม ดำทอง อ่านง่าย ใส่ได้ 6 คู่ต่อหน้า"
+        },
+        yokgong: {
+          label: "ยกกอง",
+          pairsPerPage: 12,
+          description: "รวมรูปเป็นกองตามงานเดิม เหมาะกับงานคนเยอะและอยากให้อยู่หน้าเดียว"
         }
       };
 
@@ -1414,6 +1420,10 @@
       }
 
       function getPages() {
+        if (activeTemplateKey() === "yokgong") {
+          return getYokGongPages();
+        }
+
         const pages = [];
         const building = activeBuilding();
         const tasks = building ? building.tasks : [];
@@ -1443,6 +1453,111 @@
           pages.push({ items, pairs: items.length });
         }
 
+        return pages;
+      }
+
+      function yokGongGridColumns(count) {
+        if (count <= 1) return 1;
+        if (count <= 4) return 2;
+        if (count <= 9) return 3;
+        return 4;
+      }
+
+      function yokGongCellHeight(count) {
+        if (count <= 1) return 176;
+        if (count <= 2) return 150;
+        if (count <= 4) return 126;
+        if (count <= 9) return 102;
+        return 84;
+      }
+
+      function yokGongGridHeight(count) {
+        const gap = 6;
+        const rows = Math.ceil(count / yokGongGridColumns(count));
+        return rows * yokGongCellHeight(count) + Math.max(0, rows - 1) * gap;
+      }
+
+      function yokGongBlockHeight(count) {
+        return 98 + yokGongGridHeight(count);
+      }
+
+      function findYokGongChunkThatFits(maxCount, availableHeight) {
+        for (let count = maxCount; count >= 1; count -= 1) {
+          if (yokGongBlockHeight(count) <= availableHeight) return count;
+        }
+        return 0;
+      }
+
+      function getYokGongPages() {
+        const building = activeBuilding();
+        const tasks = building ? building.tasks : [];
+        const pages = [];
+        const maxPairsPerBlock = 12;
+        const blockGap = 20;
+        const usableHeight = 1450;
+
+        let current = {
+          mode: "yokgong",
+          blocks: [],
+          pairs: 0,
+          taskIds: new Set()
+        };
+        let usedHeight = 0;
+
+        function commit() {
+          if (!current.blocks.length) return;
+          pages.push({
+            mode: "yokgong",
+            blocks: current.blocks,
+            pairs: current.pairs,
+            taskCount: current.taskIds.size
+          });
+          current = {
+            mode: "yokgong",
+            blocks: [],
+            pairs: 0,
+            taskIds: new Set()
+          };
+          usedHeight = 0;
+        }
+
+        function addBlock(task, taskIndex, startPair, count) {
+          const height = yokGongBlockHeight(count);
+          current.blocks.push({ task, taskIndex, startPair, count, height });
+          current.pairs += count;
+          current.taskIds.add(task.id);
+          usedHeight += (current.blocks.length > 1 ? blockGap : 0) + height;
+        }
+
+        tasks.forEach((task, taskIndex) => {
+          let startPair = 0;
+          let remaining = taskPairCount(task);
+
+          while (remaining > 0) {
+            const maxChunk = Math.min(remaining, maxPairsPerBlock);
+            const available = usableHeight - usedHeight - (current.blocks.length ? blockGap : 0);
+            let chunk = findYokGongChunkThatFits(maxChunk, available);
+
+            if (!chunk && current.blocks.length) {
+              commit();
+              continue;
+            }
+
+            if (!chunk) {
+              chunk = maxChunk;
+            }
+
+            addBlock(task, taskIndex, startPair, chunk);
+            startPair += chunk;
+            remaining -= chunk;
+
+            if (usedHeight >= usableHeight) {
+              commit();
+            }
+          }
+        });
+
+        commit();
         return pages;
       }
 
@@ -1585,7 +1700,10 @@
 
           const title = document.createElement("div");
           title.className = "page-preview-title";
-          title.innerHTML = `<span>หน้า ${i + 1}</span><span>${pages[i].pairs} คู่รูป · ${template.label}</span>`;
+          const pageMeta = pages[i].mode === "yokgong"
+            ? `${pages[i].taskCount} งาน · ${pages[i].pairs} คู่รูป · ${template.label}`
+            : `${pages[i].pairs} คู่รูป · ${template.label}`;
+          title.innerHTML = `<span>หน้า ${i + 1}</span><span>${pageMeta}</span>`;
           pageWrap.appendChild(title);
 
           const canvas = await renderSheetCanvas(pages[i], i + 1);
@@ -1875,11 +1993,14 @@
           thaiFamily,
           labelFamily,
           dateText: formatThaiDate(building?.date || el.workDate.value),
+          shortDateText: formatThaiDateShort(building?.date || el.workDate.value),
           buildingText: clampText(building?.name || el.buildingInput.value) || "อาคาร"
         };
 
         const templateKey = activeTemplateKey();
-        if (templateKey === "photo") {
+        if (templateKey === "yokgong") {
+          renderYokGongSheet(ctx, page, meta, pageNumber);
+        } else if (templateKey === "photo") {
           renderPhotoSheet(ctx, page, meta);
         } else if (templateKey === "compact") {
           renderCompactSheet(ctx, page, meta);
@@ -2111,6 +2232,125 @@
           drawImageBox(ctx, item.task.after[item.pairIndex], x + imageW + imageGap, y + 136, imageW, imageH);
           slot += 1;
         }
+      }
+
+      function renderYokGongSheet(ctx, page, meta, pageNumber) {
+        ctx.fillStyle = "#fbfdff";
+        ctx.fillRect(0, 0, A4.width, A4.height);
+
+        ctx.fillStyle = "#e8f6ff";
+        ctx.fillRect(0, 0, A4.width, 198);
+        ctx.fillStyle = "#ffd95f";
+        ctx.fillRect(0, 188, A4.width, 10);
+        ctx.fillStyle = "#42b6e8";
+        ctx.fillRect(0, 198, A4.width, 6);
+
+        fillRoundRect(ctx, 62, 44, 250, 60, 14, "#ffffff", "#9fd5eb", 2);
+        ctx.fillStyle = "#17485c";
+        drawCenteredFittedText(ctx, `Before-After ${meta.shortDateText}`, 187, 74, 218, 27, 18, meta.thaiFamily, "800");
+
+        ctx.font = `900 58px ${meta.thaiFamily}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = "#a9d2e4";
+        ctx.lineWidth = 7;
+        ctx.strokeText(`ยกกอง ${meta.buildingText}`, A4.width / 2, 104);
+        ctx.fillStyle = "#17485c";
+        ctx.fillText(`ยกกอง ${meta.buildingText}`, A4.width / 2, 104);
+
+        fillRoundRect(ctx, 1042, 42, 76, 76, 14, "#fff4bf", "#e0be43", 3);
+        ctx.fillStyle = "#2f2a14";
+        drawCenteredFittedText(ctx, String(pageNumber), 1080, 80, 52, 38, 22, meta.thaiFamily, "900");
+
+        fillRoundRect(ctx, 78, 156, 502, 52, 12, "#d7f1ff", "#63bce6", 2);
+        fillRoundRect(ctx, 660, 156, 502, 52, 12, "#fff0b8", "#e2bf42", 2);
+        ctx.fillStyle = "#10465e";
+        drawCenteredFittedText(ctx, "BEFORE", 329, 182, 440, 28, 20, meta.labelFamily, "900");
+        ctx.fillStyle = "#4b3600";
+        drawCenteredFittedText(ctx, "AFTER", 911, 182, 440, 28, 20, meta.labelFamily, "900");
+
+        let y = 236;
+        for (const block of page.blocks) {
+          drawYokGongBlock(ctx, block, y, meta);
+          y += block.height + 20;
+        }
+      }
+
+      function yokGongBlockTitle(block) {
+        const totalPairs = taskPairCount(block.task);
+        const base = `${block.taskIndex + 1}.) ${block.task.name} (${block.task.people} คน)`;
+        if (block.count === totalPairs) return base;
+        return `${base}  รูปคู่ ${block.startPair + 1}-${block.startPair + block.count}/${totalPairs}`;
+      }
+
+      function drawYokGongBlock(ctx, block, y, meta) {
+        const x = 58;
+        const width = 1124;
+        const sideW = 520;
+        const sideGap = 32;
+        const leftX = x + 22;
+        const rightX = leftX + sideW + sideGap;
+        const titleH = 62;
+        const labelH = 28;
+        const gridY = y + titleH + labelH + 4;
+        const gridH = yokGongGridHeight(block.count);
+
+        fillRoundRect(ctx, x, y, width, block.height, 14, "#ffffff", "#dbeaf1", 2);
+        ctx.fillStyle = "#f4fbff";
+        ctx.fillRect(x + 2, y + 2, width - 4, titleH);
+        ctx.fillStyle = "#17485c";
+        drawCenteredFittedText(ctx, yokGongBlockTitle(block), x + width / 2, y + 34, width - 76, 30, 18, meta.thaiFamily, "800");
+
+        drawYokGongSideLabel(ctx, "Before", leftX, y + titleH + 4, sideW, "#2d9dcc", "#e4f6ff", meta);
+        drawYokGongSideLabel(ctx, "After", rightX, y + titleH + 4, sideW, "#b38b00", "#fff4c9", meta);
+
+        drawYokGongCollage(ctx, block.task, "before", block.startPair, block.count, leftX, gridY, sideW, gridH, "#2d9dcc", "Before", meta);
+        drawYokGongCollage(ctx, block.task, "after", block.startPair, block.count, rightX, gridY, sideW, gridH, "#b38b00", "After", meta);
+      }
+
+      function drawYokGongSideLabel(ctx, label, x, y, width, ink, fill, meta) {
+        fillRoundRect(ctx, x, y, width, 28, 8, fill, ink, 2);
+        ctx.fillStyle = ink;
+        drawCenteredFittedText(ctx, label, x + width / 2, y + 14, width - 20, 18, 14, meta.labelFamily, "900");
+      }
+
+      function drawYokGongCollage(ctx, task, side, startPair, count, x, y, width, height, accent, label, meta) {
+        const cols = yokGongGridColumns(count);
+        const gap = 6;
+        const rows = Math.ceil(count / cols);
+        const cellW = (width - gap * (cols - 1)) / cols;
+        const cellH = (height - gap * (rows - 1)) / rows;
+
+        for (let offset = 0; offset < count; offset += 1) {
+          const col = offset % cols;
+          const row = Math.floor(offset / cols);
+          const imageX = x + col * (cellW + gap);
+          const imageY = y + row * (cellH + gap);
+          const image = task[side][startPair + offset];
+
+          if (image) {
+            ctx.save();
+            drawRoundRect(ctx, imageX, imageY, cellW, cellH, 5);
+            ctx.clip();
+            drawImageCover(ctx, image, imageX, imageY, cellW, cellH);
+            ctx.restore();
+            ctx.strokeStyle = "rgba(23,72,92,0.18)";
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(imageX, imageY, cellW, cellH);
+          } else {
+            drawYokGongPlaceholder(ctx, imageX, imageY, cellW, cellH, accent, label, meta);
+          }
+        }
+      }
+
+      function drawYokGongPlaceholder(ctx, x, y, width, height, accent, label, meta) {
+        ctx.fillStyle = "#f8faf9";
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x, y, width, height);
+        ctx.fillStyle = "rgba(23,72,92,0.42)";
+        drawCenteredFittedText(ctx, label, x + width / 2, y + height / 2, width - 16, 16, 10, meta.labelFamily, "800");
       }
 
       function drawImageBox(ctx, image, x, y, width, height) {
