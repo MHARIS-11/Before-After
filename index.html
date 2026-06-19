@@ -714,7 +714,6 @@
               <label for="templateSelect">เทมเพลตภาพ A4</label>
               <select id="templateSelect">
                 <option value="classic">Classic เดิม, 3 คู่/หน้า</option>
-                <option value="clean">Clean Grid, 4 คู่/หน้า</option>
                 <option value="photo">Photo Focus, 2 คู่/หน้า</option>
                 <option value="compact">Compact Site, 6 คู่/หน้า</option>
                 <option value="luxury">Luxury, 6 คู่/หน้า</option>
@@ -807,7 +806,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
-    (() => {
+    (async () => {
       "use strict";
 
       const A4 = { width: 1240, height: 1754 };
@@ -815,17 +814,16 @@
       const TASK_KEY = "beforeAfter.tasks.v1";
       const DRAFT_KEY = "beforeAfter.multiBuildingDraft.v1";
       const LEGACY_DRAFT_KEY = "beforeAfter.textDraft.v1";
+      const IMAGE_DB_NAME = "beforeAfter.images.v1";
+      const IMAGE_DB_VERSION = 1;
+      const IMAGE_STORE = "images";
+      const IMAGE_FALLBACK_KEY = "beforeAfter.imageFallback.v1";
       const DEFAULT_TEMPLATE = "classic";
       const TEMPLATE_DEFS = {
         classic: {
           label: "Classic",
           pairsPerPage: 3,
-          description: "แบบเดิมตามตัวอย่าง เหมาะกับงานทั่วไป"
-        },
-        clean: {
-          label: "Clean Grid",
-          pairsPerPage: 4,
-          description: "กริดสะอาด อ่านง่ายขึ้น ใส่ได้ 4 คู่ต่อหน้า"
+          description: "แบบเดิมที่อ่านง่าย เพิ่มสีสันให้แยกส่วนชัดขึ้น"
         },
         photo: {
           label: "Photo Focus",
@@ -848,7 +846,11 @@
         buildings: [],
         activeBuildingId: null,
         pickTarget: null,
-        toastTimer: null
+        toastTimer: null,
+        imageDb: null,
+        imageDbReady: false,
+        imageFallbackReady: false,
+        imageStorageReady: false
       };
 
       const el = {
@@ -980,6 +982,221 @@
       function refreshHistories() {
         fillDatalist(el.buildingHistory, readList(BUILDING_HISTORY_KEY));
         fillDatalist(el.taskHistory, readList(TASK_KEY));
+      }
+
+      function idbRequest(request) {
+        return new Promise((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error || new Error("IndexedDB error"));
+        });
+      }
+
+      function openImageDb() {
+        if (!("indexedDB" in window)) return Promise.resolve(null);
+
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(IMAGE_DB_NAME, IMAGE_DB_VERSION);
+
+          request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(IMAGE_STORE)) {
+              db.createObjectStore(IMAGE_STORE, { keyPath: "key" });
+            }
+          };
+
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error || new Error("เปิดฐานรูปไม่สำเร็จ"));
+        });
+      }
+
+      async function initImageDb() {
+        state.imageFallbackReady = canUseImageFallback();
+
+        try {
+          state.imageDb = await openImageDb();
+          state.imageDbReady = Boolean(state.imageDb);
+        } catch {
+          state.imageDb = null;
+          state.imageDbReady = false;
+        }
+
+        state.imageStorageReady = state.imageDbReady || state.imageFallbackReady;
+      }
+
+      function imageStore(mode = "readonly") {
+        if (!state.imageDb) return null;
+        return state.imageDb.transaction(IMAGE_STORE, mode).objectStore(IMAGE_STORE);
+      }
+
+      function canUseImageFallback() {
+        try {
+          const testKey = `${IMAGE_FALLBACK_KEY}.test`;
+          localStorage.setItem(testKey, "1");
+          localStorage.removeItem(testKey);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      function readImageFallbackMap() {
+        try {
+          const value = JSON.parse(localStorage.getItem(IMAGE_FALLBACK_KEY) || "{}");
+          return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+        } catch {
+          return {};
+        }
+      }
+
+      function writeImageFallbackMap(map) {
+        localStorage.setItem(IMAGE_FALLBACK_KEY, JSON.stringify(map));
+      }
+
+      function blobToDataUrl(blob) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(reader.error || new Error("อ่านรูปไม่สำเร็จ"));
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      function dataUrlToBlob(dataUrl) {
+        const [meta, payload] = String(dataUrl || "").split(",");
+        if (!meta || !payload) throw new Error("รูป fallback เสียหาย");
+        const type = meta.match(/^data:(.*?);base64$/)?.[1] || "image/png";
+        const binary = atob(payload);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        return new Blob([bytes], { type });
+      }
+
+      async function saveImageFallbackRecord(key, file) {
+        if (!state.imageFallbackReady) return false;
+        const map = readImageFallbackMap();
+        map[key] = {
+          dataUrl: await blobToDataUrl(file),
+          name: file.name || "image",
+          type: file.type || "image/*",
+          updatedAt: Date.now()
+        };
+        writeImageFallbackMap(map);
+        return true;
+      }
+
+      function getImageFallbackRecord(key) {
+        if (!state.imageFallbackReady) return null;
+        const record = readImageFallbackMap()[key];
+        if (!record?.dataUrl) return null;
+        return {
+          key,
+          blob: dataUrlToBlob(record.dataUrl),
+          name: record.name || "image",
+          type: record.type || "image/*",
+          updatedAt: record.updatedAt || 0
+        };
+      }
+
+      function deleteImageFallbackRecord(key) {
+        if (!state.imageFallbackReady) return false;
+        const map = readImageFallbackMap();
+        if (!Object.prototype.hasOwnProperty.call(map, key)) return false;
+        delete map[key];
+        writeImageFallbackMap(map);
+        return true;
+      }
+
+      function allImageFallbackKeys() {
+        if (!state.imageFallbackReady) return [];
+        return Object.keys(readImageFallbackMap());
+      }
+
+      function imageKey(task, side, index) {
+        return `${task.id}:${side}:${index}`;
+      }
+
+      async function saveImageRecord(key, file) {
+        const store = imageStore("readwrite");
+        if (!store) return saveImageFallbackRecord(key, file);
+
+        await idbRequest(store.put({
+          key,
+          blob: file,
+          name: file.name || "image",
+          type: file.type || "image/*",
+          updatedAt: Date.now()
+        }));
+
+        return true;
+      }
+
+      async function getImageRecord(key) {
+        const store = imageStore("readonly");
+        if (!store) return getImageFallbackRecord(key);
+        return idbRequest(store.get(key));
+      }
+
+      async function deleteImageRecord(key) {
+        const store = imageStore("readwrite");
+        if (!store) return deleteImageFallbackRecord(key);
+        await idbRequest(store.delete(key));
+        return true;
+      }
+
+      async function allImageKeys() {
+        const store = imageStore("readonly");
+        if (!store) return allImageFallbackKeys();
+        return idbRequest(store.getAllKeys());
+      }
+
+      function currentImageKeys() {
+        const keys = new Set();
+        state.buildings.forEach((building) => {
+          building.tasks.forEach((task) => {
+            for (const side of ["before", "after"]) {
+              for (let index = 0; index < taskPairCount(task); index += 1) {
+                keys.add(imageKey(task, side, index));
+              }
+            }
+          });
+        });
+        return keys;
+      }
+
+      async function cleanupUnusedImageRecords() {
+        if (!state.imageStorageReady) return;
+        try {
+          const keep = currentImageKeys();
+          const keys = await allImageKeys();
+          await Promise.all(keys.filter((key) => !keep.has(key)).map(deleteImageRecord));
+        } catch {
+          // Cleanup is best-effort. Failing here should not block daily work.
+        }
+      }
+
+      async function restorePersistedImages() {
+        if (!state.imageStorageReady) return;
+
+        for (const building of state.buildings) {
+          for (const task of building.tasks) {
+            for (const side of ["before", "after"]) {
+              for (let index = 0; index < taskPairCount(task); index += 1) {
+                const key = imageKey(task, side, index);
+
+                try {
+                  const record = await getImageRecord(key);
+                  if (record?.blob) {
+                    task[side][index] = await loadImageBlob(record.blob, record.name, key);
+                  }
+                } catch {
+                  await deleteImageRecord(key).catch(() => {});
+                }
+              }
+            }
+          }
+        }
       }
 
       function showToast(message) {
@@ -1446,18 +1663,27 @@
         return task[side].findIndex((image) => !image);
       }
 
-      async function loadImageFile(file) {
-        const url = URL.createObjectURL(file);
+      async function loadImageBlob(blob, name = "image", key = "") {
+        const url = URL.createObjectURL(blob);
         const img = new Image();
         img.decoding = "async";
 
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = url;
-        });
+        try {
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = url;
+          });
+        } catch (error) {
+          URL.revokeObjectURL(url);
+          throw error;
+        }
 
-        return { url, img, name: file.name };
+        return { url, img, name, key };
+      }
+
+      async function loadImageFile(file) {
+        return loadImageBlob(file, file.name);
       }
 
       function revokeImage(image) {
@@ -1469,6 +1695,7 @@
       async function addImages(task, side, files) {
         let accepted = 0;
         let ignored = 0;
+        let persistenceFailed = 0;
 
         for (const file of files) {
           const slot = firstEmptySlot(task, side);
@@ -1478,14 +1705,24 @@
           }
 
           try {
-            task[side][slot] = await loadImageFile(file);
+            const key = imageKey(task, side, slot);
+            const image = await loadImageFile(file);
+            image.key = key;
+            try {
+              await saveImageRecord(key, file);
+            } catch {
+              persistenceFailed += 1;
+            }
+            task[side][slot] = image;
             accepted += 1;
           } catch {
             ignored += 1;
           }
         }
 
-        if (accepted && ignored) {
+        if (persistenceFailed) {
+          showToast(`เพิ่มรูป ${accepted} รูปแล้ว แต่เก็บถาวรไม่ครบ ${persistenceFailed} รูป`);
+        } else if (accepted && ignored) {
           showToast(`เพิ่มรูป ${accepted} รูป และข้าม ${ignored} รูป`);
         } else if (accepted) {
           showToast(`เพิ่มรูป ${accepted} รูปแล้ว`);
@@ -1494,27 +1731,28 @@
         }
       }
 
-      function clearTaskImages(task) {
+      async function clearTaskImages(task) {
         for (const side of ["before", "after"]) {
+          await Promise.all(task[side].map((_, index) => deleteImageRecord(imageKey(task, side, index)).catch(() => {})));
           task[side].forEach(revokeImage);
           task[side] = Array(taskPairCount(task)).fill(null);
         }
       }
 
-      function revokeBuildingImages(building) {
-        building.tasks.forEach(clearTaskImages);
+      async function revokeBuildingImages(building) {
+        await Promise.all(building.tasks.map(clearTaskImages));
       }
 
-      function clearAllImages() {
+      async function clearAllImages() {
         const building = activeBuilding();
         if (!building) return;
-        building.tasks.forEach(clearTaskImages);
+        await Promise.all(building.tasks.map(clearTaskImages));
       }
 
-      function clearAll() {
+      async function clearAll() {
         const building = activeBuilding();
         if (!building) return;
-        clearAllImages();
+        await clearAllImages();
         building.tasks = [];
         building.totalWorkers = "";
         building.activeWorkers = "";
@@ -1641,9 +1879,7 @@
         };
 
         const templateKey = activeTemplateKey();
-        if (templateKey === "clean") {
-          renderCleanSheet(ctx, page, meta);
-        } else if (templateKey === "photo") {
+        if (templateKey === "photo") {
           renderPhotoSheet(ctx, page, meta);
         } else if (templateKey === "compact") {
           renderCompactSheet(ctx, page, meta);
@@ -1665,25 +1901,29 @@
       }
 
       function renderClassicSheet(ctx, page, meta) {
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = "#fffdf8";
         ctx.fillRect(0, 0, A4.width, A4.height);
+        ctx.fillStyle = "#eefbff";
+        ctx.fillRect(0, 0, A4.width, 282);
+        ctx.fillStyle = "#36b2eb";
+        ctx.fillRect(0, 278, A4.width / 2, 8);
+        ctx.fillStyle = "#f3c94f";
+        ctx.fillRect(A4.width / 2, 278, A4.width / 2, 8);
 
-        ctx.fillStyle = "#101010";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.font = `500 38px ${meta.thaiFamily}`;
-        ctx.fillText(meta.dateText, 70, 78);
+        fillRoundRect(ctx, 58, 42, 228, 72, 14, "#ffffff", "#b9e6f6", 2);
+        ctx.fillStyle = "#0e2430";
+        drawCenteredFittedText(ctx, meta.dateText, 172, 78, 188, 36, 24, meta.thaiFamily, "700");
 
-        fillRoundRect(ctx, 492, 28, 256, 94, 16, "#9ee9df", "rgba(0,0,0,0.10)", 2);
-        ctx.fillStyle = "#050505";
+        fillRoundRect(ctx, 492, 28, 256, 94, 16, "#99efe2", "#55cfc3", 3);
+        ctx.fillStyle = "#062625";
         drawCenteredFittedText(ctx, meta.buildingText, A4.width / 2, 75, 220, 48, 28, meta.thaiFamily, "900");
 
-        fillRoundRect(ctx, 168, 148, 292, 102, 12, "#36b2eb", "#121212", 4);
-        ctx.fillStyle = "#050505";
+        fillRoundRect(ctx, 168, 148, 292, 102, 12, "#31b4f0", "#0e5f84", 4);
+        ctx.fillStyle = "#041722";
         drawCenteredFittedText(ctx, "BEFORE", 314, 200, 250, 58, 44, meta.labelFamily, "900");
 
-        fillRoundRect(ctx, 780, 148, 292, 102, 12, "#ffe26c", "#333333", 4);
-        ctx.fillStyle = "#050505";
+        fillRoundRect(ctx, 780, 148, 292, 102, 12, "#ffdc55", "#9a7600", 4);
+        ctx.fillStyle = "#241a00";
         drawCenteredFittedText(ctx, "AFTER", 926, 200, 250, 58, 44, meta.labelFamily, "900");
 
         const leftX = 70;
@@ -1696,74 +1936,22 @@
 
         for (const item of page.items) {
           const taskText = pairFullTitle(item);
+          const titleY = rowTop + row * rowStep + 30;
+          fillRoundRect(ctx, 180, titleY - 27, 880, 56, 14, row % 2 ? "#f2fbff" : "#fff6d8", "#eadfbd", 2);
+          ctx.fillStyle = row % 2 ? "#1889bb" : "#d49a00";
+          ctx.fillRect(202, titleY - 18, 8, 36);
           ctx.fillStyle = "#111111";
-          drawCenteredFittedText(ctx, taskText, A4.width / 2, rowTop + row * rowStep + 30, 980, 40, 25, meta.thaiFamily, "700");
+          drawCenteredFittedText(ctx, taskText, A4.width / 2, titleY, 810, 38, 24, meta.thaiFamily, "800");
 
           const imageY = rowTop + row * rowStep + 80;
           drawImageBox(ctx, item.task.before[item.pairIndex], leftX, imageY, imageW, imageH);
           drawImageBox(ctx, item.task.after[item.pairIndex], rightX, imageY, imageW, imageH);
+          ctx.strokeStyle = "#229ed2";
+          ctx.lineWidth = 5;
+          ctx.strokeRect(leftX, imageY, imageW, imageH);
+          ctx.strokeStyle = "#d8a600";
+          ctx.strokeRect(rightX, imageY, imageW, imageH);
           row += 1;
-        }
-      }
-
-      function renderCleanSheet(ctx, page, meta) {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, A4.width, A4.height);
-        ctx.fillStyle = "#f8faf9";
-        ctx.fillRect(0, 0, A4.width, 178);
-        ctx.fillStyle = "#111827";
-        ctx.fillRect(0, 176, A4.width, 3);
-
-        ctx.fillStyle = "#111827";
-        ctx.font = `800 40px ${meta.thaiFamily}`;
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(meta.buildingText, 70, 62);
-        ctx.font = `600 28px ${meta.thaiFamily}`;
-        ctx.fillText(meta.dateText, 70, 112);
-
-        ctx.textAlign = "right";
-        ctx.font = `800 30px ${meta.labelFamily}`;
-        ctx.fillText("BEFORE / AFTER", A4.width - 70, 88);
-
-        const cardW = 540;
-        const cardH = 640;
-        const gap = 50;
-        const startX = 70;
-        const startY = 235;
-        const rowStep = 700;
-        const imageGap = 22;
-        const imageW = (cardW - imageGap) / 2;
-        const imageH = 420;
-        let slot = 0;
-
-        for (const item of page.items) {
-          const col = slot % 2;
-          const row = Math.floor(slot / 2);
-          const x = startX + col * (cardW + gap);
-          const y = startY + row * rowStep;
-
-          fillRoundRect(ctx, x, y, cardW, cardH, 8, "#ffffff", "#d8dee6", 2);
-          ctx.fillStyle = "#111827";
-          drawCenteredFittedText(ctx, pairShortTitle(item), x + cardW / 2, y + 38, cardW - 36, 30, 19, meta.thaiFamily, "800");
-          ctx.fillStyle = "#4b5563";
-          drawCenteredFittedText(ctx, `จำนวน ${item.people} คน`, x + cardW / 2, y + 76, cardW - 36, 22, 16, meta.thaiFamily, "700");
-
-          ctx.fillStyle = "#1b8fc0";
-          ctx.fillRect(x + 18, y + 110, imageW, 28);
-          ctx.fillStyle = "#b98a00";
-          ctx.fillRect(x + 18 + imageW + imageGap, y + 110, imageW, 28);
-          ctx.fillStyle = "#ffffff";
-          drawCenteredFittedText(ctx, "BEFORE", x + 18 + imageW / 2, y + 124, imageW - 12, 18, 14, meta.labelFamily, "900");
-          drawCenteredFittedText(ctx, "AFTER", x + 18 + imageW + imageGap + imageW / 2, y + 124, imageW - 12, 18, 14, meta.labelFamily, "900");
-
-          drawImageBox(ctx, item.task.before[item.pairIndex], x + 18, y + 146, imageW, imageH);
-          drawImageBox(ctx, item.task.after[item.pairIndex], x + 18 + imageW + imageGap, y + 146, imageW, imageH);
-          ctx.strokeStyle = "#e5e7eb";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x + 18, y + 146, imageW, imageH);
-          ctx.strokeRect(x + 18 + imageW + imageGap, y + 146, imageW, imageH);
-          slot += 1;
         }
       }
 
@@ -2042,12 +2230,13 @@
           const slot = Number(index);
           revokeImage(task[side][slot]);
           task[side][slot] = null;
+          await deleteImageRecord(imageKey(task, side, slot)).catch(() => {});
           sync();
           return;
         }
 
         if (action === "clear-images") {
-          clearTaskImages(task);
+          await clearTaskImages(task);
           sync();
           showToast("ล้างรูปงานนี้แล้ว");
           return;
@@ -2056,7 +2245,7 @@
         if (action === "delete") {
           const building = activeBuilding();
           if (!building) return;
-          clearTaskImages(task);
+          await clearTaskImages(task);
           building.tasks = building.tasks.filter((item) => item.id !== id);
           sync();
           showToast("ลบงานแล้ว");
@@ -2094,7 +2283,7 @@
         showToast("เพิ่มอาคารแล้ว");
       });
 
-      el.buildingList.addEventListener("click", (event) => {
+      el.buildingList.addEventListener("click", async (event) => {
         const button = event.target.closest("button");
         if (!button) return;
 
@@ -2107,7 +2296,7 @@
         if (action === "delete-building") {
           const building = state.buildings.find((item) => item.id === id);
           if (!building) return;
-          revokeBuildingImages(building);
+          await revokeBuildingImages(building);
           state.buildings = state.buildings.filter((item) => item.id !== id);
           if (state.activeBuildingId === id) state.activeBuildingId = null;
           renderShell();
@@ -2157,13 +2346,16 @@
 
       el.exportBtn.addEventListener("click", exportPngPages);
 
-      el.clearAllBtn.addEventListener("click", () => {
-        clearAll();
+      el.clearAllBtn.addEventListener("click", async () => {
+        await clearAll();
         showToast("ล้างข้อมูลอาคารนี้แล้ว");
       });
 
       refreshHistories();
       loadTextDraft();
+      await initImageDb();
+      await restorePersistedImages();
+      await cleanupUnusedImageRecords();
       if (state.activeBuildingId) {
         const building = activeBuilding();
         if (building) loadBuildingToForm(building);
