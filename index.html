@@ -49,7 +49,9 @@
     }
 
     button,
-    input {
+    input,
+    select,
+    textarea {
       font: inherit;
     }
 
@@ -73,7 +75,9 @@
     }
 
     button:focus-visible,
-    input:focus-visible {
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
       outline: 3px solid oklch(0.760 0.120 112 / 0.45);
       outline-offset: 2px;
     }
@@ -214,6 +218,21 @@
       grid-column: 1 / -1;
     }
 
+    .date-row,
+    .split-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .date-row {
+      grid-template-columns: minmax(0, 1fr) 108px;
+      align-items: end;
+    }
+
+    .task-cancel {
+      grid-column: 1 / -1;
+    }
+
     .primary-btn,
     .secondary-btn,
     .ghost-btn,
@@ -351,6 +370,10 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
+    }
+
+    .manage-actions {
+      grid-template-columns: 1fr 1fr 88px;
     }
 
     .slot-grid {
@@ -630,6 +653,10 @@
         grid-template-columns: minmax(0, 1fr) 116px;
       }
 
+      .split-fields {
+        grid-template-columns: 1fr 1fr;
+      }
+
       .preview-pages {
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       }
@@ -701,13 +728,35 @@
           <div class="grid">
             <div class="field">
               <label for="workDate">วันที่</label>
-              <input id="workDate" type="text" inputmode="numeric" autocomplete="off" placeholder="วว/ดด/พ.ศ.">
+              <div class="date-row">
+                <input id="workDate" type="text" inputmode="numeric" autocomplete="off" placeholder="วว/ดด/พ.ศ.">
+                <button class="secondary-btn" type="button" id="todayDateBtn">ปัจจุบัน</button>
+              </div>
               <p class="field-note" id="thaiDateText"></p>
             </div>
 
             <div class="field">
+              <label for="buildingModeSelect">จำนวนอาคารในชุดนี้</label>
+              <select id="buildingModeSelect">
+                <option value="single">1 อาคาร</option>
+                <option value="double">2 อาคาร</option>
+              </select>
+            </div>
+
+            <div class="field" id="singleBuildingField">
               <label for="buildingInput">ชื่ออาคาร</label>
               <input id="buildingInput" list="buildingHistory" autocomplete="off" placeholder="เช่น อาคาร G">
+            </div>
+
+            <div class="split-fields hidden" id="doubleBuildingFields">
+              <div class="field">
+                <label for="buildingInputA">ชื่ออาคาร 1</label>
+                <input id="buildingInputA" list="buildingHistory" autocomplete="off" placeholder="เช่น อาคาร G">
+              </div>
+              <div class="field">
+                <label for="buildingInputB">ชื่ออาคาร 2</label>
+                <input id="buildingInputB" list="buildingHistory" autocomplete="off" placeholder="เช่น อาคาร I">
+              </div>
             </div>
 
             <div class="field">
@@ -758,6 +807,11 @@
           </div>
 
           <form class="task-form" id="taskForm">
+            <div class="field full hidden" id="taskBuildingField">
+              <label for="taskBuildingSelect">งานนี้อยู่ที่</label>
+              <select id="taskBuildingSelect"></select>
+            </div>
+
             <div class="field full">
               <label for="taskNameInput">ชื่องาน</label>
               <input id="taskNameInput" list="taskHistory" autocomplete="off" placeholder="เช่น งานเข้าแบบฐานราก">
@@ -769,7 +823,8 @@
               <input id="peopleInput" type="number" inputmode="numeric" min="1" step="1" placeholder="2">
             </div>
 
-            <button class="primary-btn" type="submit">เพิ่มงาน</button>
+            <button class="primary-btn" type="submit" id="taskSubmitBtn">เพิ่มงาน</button>
+            <button class="ghost-btn task-cancel hidden" type="button" id="taskCancelEditBtn">ยกเลิกแก้ไข</button>
           </form>
         </section>
       </div>
@@ -820,6 +875,10 @@
       const IMAGE_STORE = "images";
       const IMAGE_FALLBACK_KEY = "beforeAfter.imageFallback.v1";
       const DEFAULT_TEMPLATE = "classic";
+      const BUILDING_MODE_SINGLE = "single";
+      const BUILDING_MODE_DOUBLE = "double";
+      const SUB_BUILDING_A = "a";
+      const SUB_BUILDING_B = "b";
       const TEMPLATE_DEFS = {
         classic: {
           label: "Classic",
@@ -852,6 +911,7 @@
         buildings: [],
         activeBuildingId: null,
         pickTarget: null,
+        editingTaskId: null,
         toastTimer: null,
         imageDb: null,
         imageDbReady: false,
@@ -871,8 +931,14 @@
         buildingList: document.getElementById("buildingList"),
         buildingSummary: document.getElementById("buildingSummary"),
         workDate: document.getElementById("workDate"),
+        todayDateBtn: document.getElementById("todayDateBtn"),
         thaiDateText: document.getElementById("thaiDateText"),
+        buildingModeSelect: document.getElementById("buildingModeSelect"),
+        singleBuildingField: document.getElementById("singleBuildingField"),
+        doubleBuildingFields: document.getElementById("doubleBuildingFields"),
         buildingInput: document.getElementById("buildingInput"),
+        buildingInputA: document.getElementById("buildingInputA"),
+        buildingInputB: document.getElementById("buildingInputB"),
         buildingHistory: document.getElementById("buildingHistory"),
         templateSelect: document.getElementById("templateSelect"),
         templateDescription: document.getElementById("templateDescription"),
@@ -881,8 +947,12 @@
         reportText: document.getElementById("reportText"),
         copyReportBtn: document.getElementById("copyReportBtn"),
         taskForm: document.getElementById("taskForm"),
+        taskBuildingField: document.getElementById("taskBuildingField"),
+        taskBuildingSelect: document.getElementById("taskBuildingSelect"),
         taskNameInput: document.getElementById("taskNameInput"),
         peopleInput: document.getElementById("peopleInput"),
+        taskSubmitBtn: document.getElementById("taskSubmitBtn"),
+        taskCancelEditBtn: document.getElementById("taskCancelEditBtn"),
         taskHistory: document.getElementById("taskHistory"),
         taskList: document.getElementById("taskList"),
         taskSummary: document.getElementById("taskSummary"),
@@ -956,6 +1026,76 @@
         return String(value || "").trim().replace(/\s+/g, " ");
       }
 
+      function normalizeBuildingMode(value) {
+        return value === BUILDING_MODE_DOUBLE ? BUILDING_MODE_DOUBLE : BUILDING_MODE_SINGLE;
+      }
+
+      function normalizeSubBuildingId(building, id) {
+        if (building?.buildingMode !== BUILDING_MODE_DOUBLE) return SUB_BUILDING_A;
+        return id === SUB_BUILDING_B ? SUB_BUILDING_B : SUB_BUILDING_A;
+      }
+
+      function makeSubBuildings(name = "") {
+        return [
+          { id: SUB_BUILDING_A, name: clampText(name) },
+          { id: SUB_BUILDING_B, name: "" }
+        ];
+      }
+
+      function restoreSubBuildings(saved, fallbackName = "") {
+        const names = new Map();
+        if (Array.isArray(saved)) {
+          saved.forEach((item) => {
+            if (item?.id === SUB_BUILDING_A || item?.id === SUB_BUILDING_B) {
+              names.set(item.id, clampText(item.name));
+            }
+          });
+        }
+
+        return [
+          { id: SUB_BUILDING_A, name: names.get(SUB_BUILDING_A) || clampText(fallbackName) },
+          { id: SUB_BUILDING_B, name: names.get(SUB_BUILDING_B) || "" }
+        ];
+      }
+
+      function subBuildingName(building, id) {
+        if (!building) return "อาคาร";
+        const safeId = normalizeSubBuildingId(building, id);
+        const item = building.subBuildings?.find((entry) => entry.id === safeId);
+        const fallback = safeId === SUB_BUILDING_B ? "อาคาร 2" : "อาคาร 1";
+        return clampText(item?.name) || (building.buildingMode === BUILDING_MODE_DOUBLE ? fallback : displayBuildingName(building));
+      }
+
+      function displayBuildingName(building) {
+        if (!building) return "อาคาร";
+        if (building.buildingMode === BUILDING_MODE_DOUBLE) {
+          const names = (building.subBuildings || []).map((item) => clampText(item.name)).filter(Boolean);
+          return names.length ? names.join(",") : clampText(building.name) || "2 อาคาร";
+        }
+
+        return clampText(building.name || building.subBuildings?.[0]?.name) || "อาคาร";
+      }
+
+      function syncBuildingName(building) {
+        if (!building) return;
+        if (building.buildingMode === BUILDING_MODE_DOUBLE) {
+          building.name = displayBuildingName(building);
+        } else {
+          const singleName = clampText(building.subBuildings?.[0]?.name || building.name);
+          building.name = singleName || "อาคาร";
+          building.subBuildings = building.subBuildings || makeSubBuildings(building.name);
+          building.subBuildings[0].name = building.name;
+        }
+      }
+
+      function taskDisplayName(task, building = activeBuilding()) {
+        const name = clampText(task?.name);
+        if (building?.buildingMode === BUILDING_MODE_DOUBLE) {
+          return `${subBuildingName(building, task.buildingId)} - ${name}`;
+        }
+        return name;
+      }
+
       function readList(key) {
         try {
           const list = JSON.parse(localStorage.getItem(key) || "[]");
@@ -988,6 +1128,14 @@
       function refreshHistories() {
         fillDatalist(el.buildingHistory, readList(BUILDING_HISTORY_KEY));
         fillDatalist(el.taskHistory, readList(TASK_KEY));
+      }
+
+      function rememberBuildingNames(building) {
+        if (!building) return;
+        if (building.buildingMode === BUILDING_MODE_DOUBLE) {
+          (building.subBuildings || []).forEach((item) => rememberValue(BUILDING_HISTORY_KEY, item.name));
+        }
+        rememberValue(BUILDING_HISTORY_KEY, displayBuildingName(building));
       }
 
       function idbRequest(request) {
@@ -1220,7 +1368,12 @@
           activeBuildingId: state.activeBuildingId,
           buildings: state.buildings.map((building) => ({
             id: building.id,
-            name: building.name,
+            name: displayBuildingName(building),
+            buildingMode: normalizeBuildingMode(building.buildingMode),
+            subBuildings: (building.subBuildings || makeSubBuildings(building.name)).map((item) => ({
+              id: item.id,
+              name: item.name
+            })),
             date: building.date,
             template: building.template,
             totalWorkers: building.totalWorkers,
@@ -1234,18 +1387,18 @@
       function loadTextDraft() {
         try {
           const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-          if (draft && draft.savedOn === todayStorageKey() && Array.isArray(draft.buildings)) {
+          if (draft && Array.isArray(draft.buildings)) {
             state.buildings = draft.buildings.map(restoreBuilding);
             state.activeBuildingId = null;
             return true;
           }
 
           const legacy = JSON.parse(localStorage.getItem(LEGACY_DRAFT_KEY) || "null");
-          if (legacy && legacy.savedOn === todayStorageKey() && (legacy.building || Array.isArray(legacy.tasks))) {
+          if (legacy && (legacy.building || Array.isArray(legacy.tasks))) {
             const building = makeBuilding(legacy.building || "อาคาร");
             building.date = formatThaiDate(legacy.date || todayThaiValue());
             building.tasks = Array.isArray(legacy.tasks)
-              ? legacy.tasks.map((task) => makeTask(task.name, task.people, task.id))
+              ? legacy.tasks.map((task) => makeTask(task.name, task.people, task.id, SUB_BUILDING_A))
               : [];
             state.buildings = [building];
             state.activeBuildingId = null;
@@ -1262,26 +1415,33 @@
         return {
           id: task.id,
           name: task.name,
-          people: task.people
+          people: task.people,
+          buildingId: task.buildingId || SUB_BUILDING_A
         };
       }
 
       function restoreBuilding(saved) {
         const building = makeBuilding(saved.name || "อาคาร", saved.id || uid());
+        building.buildingMode = normalizeBuildingMode(saved.buildingMode);
+        building.subBuildings = restoreSubBuildings(saved.subBuildings, saved.name || building.name);
         building.date = formatThaiDate(saved.date || todayThaiValue());
         building.template = TEMPLATE_DEFS[saved.template] ? saved.template : DEFAULT_TEMPLATE;
         building.totalWorkers = saved.totalWorkers || "";
         building.activeWorkers = saved.activeWorkers || "";
         building.tasks = Array.isArray(saved.tasks)
-          ? saved.tasks.map((task) => makeTask(task.name, task.people, task.id))
+          ? saved.tasks.map((task) => makeTask(task.name, task.people, task.id, normalizeSubBuildingId(building, task.buildingId)))
           : [];
+        syncBuildingName(building);
         return building;
       }
 
       function makeBuilding(name, id = uid()) {
+        const safeName = clampText(name) || `อาคาร ${state.buildings.length + 1}`;
         return {
           id,
-          name: clampText(name) || `อาคาร ${state.buildings.length + 1}`,
+          name: safeName,
+          buildingMode: BUILDING_MODE_SINGLE,
+          subBuildings: makeSubBuildings(safeName),
           date: todayThaiValue(),
           template: DEFAULT_TEMPLATE,
           totalWorkers: "",
@@ -1290,20 +1450,21 @@
         };
       }
 
-      function makeTask(name, people, id = uid()) {
+      function makeTask(name, people, id = uid(), buildingId = SUB_BUILDING_A) {
         const safePeople = Math.max(1, Math.floor(Number(people) || 1));
         const pairs = pairCountForPeople(safePeople);
         return {
           id,
           name: clampText(name),
           people: safePeople,
+          buildingId,
           before: Array(pairs).fill(null),
           after: Array(pairs).fill(null)
         };
       }
 
       function taskPairCount(task) {
-        return task.before.length;
+        return Array.isArray(task.before) ? task.before.length : pairCountForPeople(task.people);
       }
 
       function activeBuilding() {
@@ -1324,12 +1485,37 @@
         el.templateDescription.textContent = template.description;
       }
 
+      function updateTaskBuildingOptions(building, selectedId = el.taskBuildingSelect.value) {
+        const safeSelected = selectedId === SUB_BUILDING_B ? SUB_BUILDING_B : SUB_BUILDING_A;
+        el.taskBuildingSelect.innerHTML = [SUB_BUILDING_A, SUB_BUILDING_B].map((id) => (
+          `<option value="${id}">${escapeHtml(subBuildingName(building, id))}</option>`
+        )).join("");
+        el.taskBuildingSelect.value = safeSelected;
+      }
+
+      function renderBuildingModeFields(building) {
+        const isDouble = building?.buildingMode === BUILDING_MODE_DOUBLE;
+        el.singleBuildingField.classList.toggle("hidden", isDouble);
+        el.doubleBuildingFields.classList.toggle("hidden", !isDouble);
+        el.taskBuildingField.classList.toggle("hidden", !isDouble);
+        updateTaskBuildingOptions(building);
+      }
+
       function loadBuildingToForm(building) {
+        building.buildingMode = normalizeBuildingMode(building.buildingMode);
+        building.subBuildings = building.subBuildings || makeSubBuildings(building.name);
+        syncBuildingName(building);
         el.workDate.value = formatThaiDate(building.date || todayThaiValue());
-        el.buildingInput.value = building.name || "";
+        el.buildingModeSelect.value = building.buildingMode;
+        el.buildingInput.value = building.buildingMode === BUILDING_MODE_DOUBLE
+          ? subBuildingName(building, SUB_BUILDING_A)
+          : displayBuildingName(building);
+        el.buildingInputA.value = subBuildingName(building, SUB_BUILDING_A);
+        el.buildingInputB.value = building.subBuildings.find((item) => item.id === SUB_BUILDING_B)?.name || "";
         el.templateSelect.value = TEMPLATE_DEFS[building.template] ? building.template : DEFAULT_TEMPLATE;
         el.totalWorkersInput.value = building.totalWorkers || "";
         el.activeWorkersInput.value = building.activeWorkers || "";
+        renderBuildingModeFields(building);
         updateTemplateDescription();
       }
 
@@ -1337,10 +1523,19 @@
         const building = activeBuilding();
         if (!building) return null;
         building.date = formatThaiDate(el.workDate.value || building.date || todayThaiValue());
-        building.name = clampText(el.buildingInput.value) || building.name || "อาคาร";
+        building.buildingMode = normalizeBuildingMode(el.buildingModeSelect.value);
+        building.subBuildings = building.subBuildings || makeSubBuildings(building.name);
+        if (building.buildingMode === BUILDING_MODE_DOUBLE) {
+          building.subBuildings[0].name = clampText(el.buildingInputA.value) || subBuildingName(building, SUB_BUILDING_A);
+          building.subBuildings[1].name = clampText(el.buildingInputB.value) || subBuildingName(building, SUB_BUILDING_B);
+        } else {
+          building.subBuildings[0].name = clampText(el.buildingInput.value) || displayBuildingName(building);
+        }
+        syncBuildingName(building);
         building.template = TEMPLATE_DEFS[el.templateSelect.value] ? el.templateSelect.value : DEFAULT_TEMPLATE;
         building.totalWorkers = el.totalWorkersInput.value;
         building.activeWorkers = el.activeWorkersInput.value;
+        renderBuildingModeFields(building);
         return building;
       }
 
@@ -1349,12 +1544,14 @@
         if (!building) return;
         state.activeBuildingId = building.id;
         loadBuildingToForm(building);
+        resetTaskForm();
         renderShell();
         sync({ skipPull: true });
       }
 
       function goHome() {
         pullFormToBuilding();
+        state.editingTaskId = null;
         state.activeBuildingId = null;
         renderShell();
         saveTextDraft();
@@ -1374,7 +1571,7 @@
           el.pageCountPill.textContent = `${state.buildings.length} อาคาร`;
           renderHome();
         } else {
-          el.appTitle.textContent = building.name || "อาคาร";
+          el.appTitle.textContent = displayBuildingName(building);
           el.appSubtitle.textContent = "เพิ่มงาน ใส่รูป และสร้างรายงาน";
         }
       }
@@ -1400,8 +1597,9 @@
           card.innerHTML = `
             <div class="building-card-head">
               <div>
-                <p class="building-name">${escapeHtml(building.name)}</p>
+                <p class="building-name">${escapeHtml(displayBuildingName(building))}</p>
                 <div class="task-meta">
+                <span class="tag">${formatThaiDate(building.date || todayThaiValue())}</span>
                 <span class="tag">${building.tasks.length} งาน</span>
                 <span class="tag">${totalPairs} คู่รูป</span>
                 <span class="tag">${TEMPLATE_DEFS[building.template]?.label || TEMPLATE_DEFS[DEFAULT_TEMPLATE].label}</span>
@@ -1578,6 +1776,9 @@
         }
 
         tasks.forEach((task, index) => {
+          const buildingTag = building.buildingMode === BUILDING_MODE_DOUBLE
+            ? `<span class="tag">${escapeHtml(subBuildingName(building, task.buildingId))}</span>`
+            : "";
           const article = document.createElement("article");
           article.className = "task-item";
 
@@ -1588,6 +1789,7 @@
             <div>
               <p class="task-name">${escapeHtml(task.name)}</p>
               <div class="task-meta">
+                ${buildingTag}
                 <span class="tag">จำนวน ${task.people} คน</span>
                 <span class="tag">${taskPairCount(task)} คู่รูป</span>
                 <span class="tag">Before ${imageCount(task.before)}/${taskPairCount(task)}</span>
@@ -1620,9 +1822,10 @@
           article.appendChild(slotGrid);
 
           const manage = document.createElement("div");
-          manage.className = "task-actions";
+          manage.className = "task-actions manage-actions";
           manage.innerHTML = `
-            <button class="ghost-btn" type="button" data-action="clear-images" data-id="${task.id}">ล้างรูปงานนี้</button>
+            <button class="ghost-btn" type="button" data-action="edit" data-id="${task.id}">แก้ไข</button>
+            <button class="ghost-btn" type="button" data-action="clear-images" data-id="${task.id}">ล้างรูป</button>
             <button class="danger-btn" type="button" data-action="delete" data-id="${task.id}">ลบงาน</button>
           `;
           article.appendChild(manage);
@@ -1744,13 +1947,29 @@
         if (!building) return "";
         const total = Math.max(0, Math.floor(Number(building.totalWorkers) || 0));
         const active = Math.max(0, Math.floor(Number(building.activeWorkers) || 0));
-        const taskLines = building.tasks.map((task, index) => `${index + 1}. ${task.name}`);
-        return [
+        const lines = [
           formatThaiDateShort(building.date || el.workDate.value),
-          `✅ คนงานทั้งหมด ${total}คน`,
-          `✳️ ลงงาน ${active} คน`,
-          ...taskLines
-        ].join("\n");
+        ];
+
+        if (building.buildingMode === BUILDING_MODE_DOUBLE) {
+          lines.push(`(${displayBuildingName(building)})`);
+        }
+
+        lines.push(`✅ คนงานทั้งหมด ${total} คน`);
+        lines.push(`✳️ ลงงาน ${active} คน`);
+
+        if (building.buildingMode === BUILDING_MODE_DOUBLE) {
+          [SUB_BUILDING_A, SUB_BUILDING_B].forEach((id) => {
+            const tasks = building.tasks.filter((task) => normalizeSubBuildingId(building, task.buildingId) === id);
+            if (!tasks.length) return;
+            lines.push(subBuildingName(building, id));
+            tasks.forEach((task) => lines.push(` - ${task.name}`));
+          });
+        } else {
+          building.tasks.forEach((task, index) => lines.push(`${index + 1}. ${task.name}`));
+        }
+
+        return lines.join("\n");
       }
 
       function renderReportPreview() {
@@ -1874,11 +2093,66 @@
         building.tasks = [];
         building.totalWorkers = "";
         building.activeWorkers = "";
+        state.editingTaskId = null;
         el.taskNameInput.value = "";
         el.peopleInput.value = "";
         el.totalWorkersInput.value = "";
         el.activeWorkersInput.value = "";
+        resetTaskForm();
         sync();
+      }
+
+      function resetTaskForm(options = {}) {
+        state.editingTaskId = null;
+        el.taskForm.classList.remove("editing");
+        el.taskNameInput.value = "";
+        el.peopleInput.value = "";
+        el.taskSubmitBtn.textContent = "เพิ่มงาน";
+        el.taskCancelEditBtn.classList.add("hidden");
+        const building = activeBuilding();
+        updateTaskBuildingOptions(building, SUB_BUILDING_A);
+        if (options.focus) el.taskNameInput.focus();
+      }
+
+      function startEditingTask(task) {
+        const building = activeBuilding();
+        state.editingTaskId = task.id;
+        el.taskForm.classList.add("editing");
+        el.taskNameInput.value = task.name;
+        el.peopleInput.value = task.people;
+        updateTaskBuildingOptions(building, normalizeSubBuildingId(building, task.buildingId));
+        el.taskSubmitBtn.textContent = "บันทึกงาน";
+        el.taskCancelEditBtn.classList.remove("hidden");
+        el.taskNameInput.focus();
+        el.taskForm.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      async function resizeTaskPairs(task, newPairCount) {
+        const safeCount = Math.max(1, newPairCount);
+        for (const side of ["before", "after"]) {
+          const list = Array.isArray(task[side]) ? task[side] : [];
+          if (safeCount < list.length) {
+            const removed = list.slice(safeCount);
+            removed.forEach(revokeImage);
+            await Promise.all(removed.map((_, offset) => (
+              deleteImageRecord(imageKey(task, side, safeCount + offset)).catch(() => {})
+            )));
+            task[side] = list.slice(0, safeCount);
+          } else if (safeCount > list.length) {
+            task[side] = list.concat(Array(safeCount - list.length).fill(null));
+          } else {
+            task[side] = list;
+          }
+        }
+      }
+
+      async function updateTaskDetails(task, name, people, buildingId) {
+        const safePeople = Math.max(1, Math.floor(Number(people) || 1));
+        const newPairs = pairCountForPeople(safePeople);
+        await resizeTaskPairs(task, newPairs);
+        task.name = clampText(name);
+        task.people = safePeople;
+        task.buildingId = buildingId === SUB_BUILDING_B ? SUB_BUILDING_B : SUB_BUILDING_A;
       }
 
       function drawRoundRect(ctx, x, y, width, height, radius) {
@@ -1994,7 +2268,7 @@
           labelFamily,
           dateText: formatThaiDate(building?.date || el.workDate.value),
           shortDateText: formatThaiDateShort(building?.date || el.workDate.value),
-          buildingText: clampText(building?.name || el.buildingInput.value) || "อาคาร"
+          buildingText: displayBuildingName(building) || "อาคาร"
         };
 
         const templateKey = activeTemplateKey();
@@ -2014,11 +2288,11 @@
       }
 
       function pairFullTitle(item) {
-        return `${item.itemIndex}.) ${item.task.name}  จำนวน  ${item.people}  คน`;
+        return `${item.itemIndex}.) ${taskDisplayName(item.task)}  จำนวน  ${item.people}  คน`;
       }
 
       function pairShortTitle(item) {
-        return `${item.itemIndex}.) ${item.task.name}`;
+        return `${item.itemIndex}.) ${taskDisplayName(item.task)}`;
       }
 
       function renderClassicSheet(ctx, page, meta) {
@@ -2278,7 +2552,7 @@
 
       function yokGongBlockTitle(block) {
         const totalPairs = taskPairCount(block.task);
-        const base = `${block.taskIndex + 1}.) ${block.task.name} (${block.task.people} คน)`;
+        const base = `${block.taskIndex + 1}.) ${taskDisplayName(block.task)} (${block.task.people} คน)`;
         if (block.count === totalPairs) return base;
         return `${base}  รูปคู่ ${block.startPair + 1}-${block.startPair + block.count}/${totalPairs}`;
       }
@@ -2393,7 +2667,7 @@
           return;
         }
 
-        rememberValue(BUILDING_HISTORY_KEY, buildingData?.name || el.buildingInput.value);
+        rememberBuildingNames(buildingData);
         refreshHistories();
 
         el.exportBtn.disabled = true;
@@ -2401,7 +2675,7 @@
 
         try {
           const date = formatThaiDate(buildingData?.date || el.workDate.value).replaceAll("/", "-");
-          const building = sanitizeFileName(buildingData?.name || el.buildingInput.value || "อาคาร");
+          const building = sanitizeFileName(displayBuildingName(buildingData) || el.buildingInput.value || "อาคาร");
 
           for (let i = 0; i < pages.length; i += 1) {
             const canvas = await renderSheetCanvas(pages[i], i + 1);
@@ -2418,7 +2692,7 @@
         }
       }
 
-      el.taskForm.addEventListener("submit", (event) => {
+      el.taskForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const building = activeBuilding();
         if (!building) {
@@ -2441,13 +2715,25 @@
           return;
         }
 
-        building.tasks.push(makeTask(name, people));
+        const buildingId = building.buildingMode === BUILDING_MODE_DOUBLE
+          ? el.taskBuildingSelect.value
+          : SUB_BUILDING_A;
+        const editingTask = state.editingTaskId
+          ? building.tasks.find((task) => task.id === state.editingTaskId)
+          : null;
+
+        if (editingTask) {
+          await updateTaskDetails(editingTask, name, people, buildingId);
+          showToast("บันทึกงานแล้ว");
+        } else {
+          building.tasks.push(makeTask(name, people, uid(), buildingId));
+          showToast("เพิ่มงานแล้ว");
+        }
+
         rememberValue(TASK_KEY, name);
-        rememberValue(BUILDING_HISTORY_KEY, building.name);
+        rememberBuildingNames(building);
         refreshHistories();
-        el.taskNameInput.value = "";
-        el.peopleInput.value = "";
-        el.taskNameInput.focus();
+        resetTaskForm({ focus: true });
         sync();
       });
 
@@ -2482,11 +2768,17 @@
           return;
         }
 
+        if (action === "edit") {
+          startEditingTask(task);
+          return;
+        }
+
         if (action === "delete") {
           const building = activeBuilding();
           if (!building) return;
           await clearTaskImages(task);
           building.tasks = building.tasks.filter((item) => item.id !== id);
+          if (state.editingTaskId === id) resetTaskForm();
           sync();
           showToast("ลบงานแล้ว");
         }
@@ -2555,18 +2847,44 @@
         el.workDate.value = formatThaiDate(el.workDate.value);
         sync();
       });
-      el.buildingInput.addEventListener("input", () => {
+
+      el.todayDateBtn.addEventListener("click", () => {
+        el.workDate.value = todayThaiValue();
+        sync();
+        showToast("อัปเดตวันที่เป็นวันนี้แล้ว");
+      });
+
+      el.buildingModeSelect.addEventListener("change", () => {
         const building = pullFormToBuilding();
         if (building) {
-          el.appTitle.textContent = building.name || "อาคาร";
+          renderBuildingModeFields(building);
+          el.appTitle.textContent = displayBuildingName(building);
+        }
+        sync({ skipPull: true });
+        showToast(el.buildingModeSelect.value === BUILDING_MODE_DOUBLE ? "ใช้โหมด 2 อาคาร" : "ใช้โหมด 1 อาคาร");
+      });
+
+      function handleBuildingNameInput() {
+        const building = pullFormToBuilding();
+        if (building) {
+          el.appTitle.textContent = displayBuildingName(building);
         }
         saveTextDraft();
+        renderTaskList();
+        renderReportPreview();
         renderPreview();
-      });
-      el.buildingInput.addEventListener("blur", () => {
-        rememberValue(BUILDING_HISTORY_KEY, el.buildingInput.value);
+      }
+
+      function handleBuildingNameBlur() {
+        const building = pullFormToBuilding();
+        rememberBuildingNames(building);
         refreshHistories();
         sync();
+      }
+
+      [el.buildingInput, el.buildingInputA, el.buildingInputB].forEach((input) => {
+        input.addEventListener("input", handleBuildingNameInput);
+        input.addEventListener("blur", handleBuildingNameBlur);
       });
 
       el.templateSelect.addEventListener("change", () => {
@@ -2578,6 +2896,7 @@
       el.totalWorkersInput.addEventListener("input", sync);
       el.activeWorkersInput.addEventListener("input", sync);
       el.copyReportBtn.addEventListener("click", copyReport);
+      el.taskCancelEditBtn.addEventListener("click", () => resetTaskForm({ focus: true }));
 
       el.previewBtn.addEventListener("click", async () => {
         await renderPreview();
