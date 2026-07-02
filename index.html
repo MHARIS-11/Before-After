@@ -330,7 +330,7 @@
 
     .task-form {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 108px;
+      grid-template-columns: minmax(0, 1fr);
       gap: 10px;
       align-items: end;
     }
@@ -377,6 +377,27 @@
 
     .task-cancel {
       grid-column: 1 / -1;
+    }
+
+    .inline-edit-form {
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid oklch(0.770 0.070 112);
+      border-radius: var(--radius);
+      background: oklch(0.970 0.018 112);
+    }
+
+    .inline-edit-title {
+      margin: 0;
+      color: oklch(0.270 0.075 112);
+      font-weight: 900;
+    }
+
+    .inline-edit-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
 
     .primary-btn,
@@ -754,6 +775,11 @@
       color: oklch(0.900 0.020 145 / 0.65);
     }
 
+    .summary-stat input[readonly] {
+      color: oklch(0.860 0.100 145);
+      cursor: default;
+    }
+
     .summary-copy-btn {
       grid-column: 1 / -1;
       justify-content: space-between;
@@ -953,7 +979,7 @@
       }
 
       .task-form {
-        grid-template-columns: minmax(0, 1fr) 116px;
+        grid-template-columns: minmax(0, 1fr);
       }
 
       .split-fields {
@@ -1094,7 +1120,7 @@
               </div>
               <div class="summary-stat">
                 <label for="activeWorkersInput">ลงงาน</label>
-                <input id="activeWorkersInput" type="number" inputmode="numeric" min="0" step="1" placeholder="6">
+                <input id="activeWorkersInput" type="number" inputmode="numeric" min="0" step="1" placeholder="0" readonly>
               </div>
 
               <button class="summary-copy-btn" type="button" id="copyReportBtn">
@@ -1776,6 +1802,12 @@
         return Array.isArray(task.before) ? task.before.length : pairCountForPeople(task.people);
       }
 
+      function activeWorkerTotal(building) {
+        return (building?.tasks || []).reduce((sum, task) => (
+          sum + Math.max(0, Math.floor(Number(task.people) || 0))
+        ), 0);
+      }
+
       function activeBuilding() {
         return state.buildings.find((building) => building.id === state.activeBuildingId) || null;
       }
@@ -1796,10 +1828,15 @@
 
       function updateTaskBuildingOptions(building, selectedId = el.taskBuildingSelect.value) {
         const safeSelected = selectedId === SUB_BUILDING_B ? SUB_BUILDING_B : SUB_BUILDING_A;
-        el.taskBuildingSelect.innerHTML = [SUB_BUILDING_A, SUB_BUILDING_B].map((id) => (
-          `<option value="${id}">${escapeHtml(subBuildingName(building, id))}</option>`
-        )).join("");
+        el.taskBuildingSelect.innerHTML = subBuildingOptionsHtml(building, safeSelected);
         el.taskBuildingSelect.value = safeSelected;
+      }
+
+      function subBuildingOptionsHtml(building, selectedId = SUB_BUILDING_A) {
+        const safeSelected = selectedId === SUB_BUILDING_B ? SUB_BUILDING_B : SUB_BUILDING_A;
+        return [SUB_BUILDING_A, SUB_BUILDING_B].map((id) => (
+          `<option value="${id}"${id === safeSelected ? " selected" : ""}>${escapeHtml(subBuildingName(building, id))}</option>`
+        )).join("");
       }
 
       function renderBuildingModeFields(building) {
@@ -1823,7 +1860,8 @@
         el.buildingInputB.value = building.subBuildings.find((item) => item.id === SUB_BUILDING_B)?.name || "";
         el.templateSelect.value = TEMPLATE_DEFS[building.template] ? building.template : DEFAULT_TEMPLATE;
         el.totalWorkersInput.value = building.totalWorkers || "";
-        el.activeWorkersInput.value = building.activeWorkers || "";
+        building.activeWorkers = String(activeWorkerTotal(building));
+        el.activeWorkersInput.value = building.activeWorkers;
         renderBuildingModeFields(building);
         updateTemplateDescription();
       }
@@ -1843,7 +1881,8 @@
         syncBuildingName(building);
         building.template = TEMPLATE_DEFS[el.templateSelect.value] ? el.templateSelect.value : DEFAULT_TEMPLATE;
         building.totalWorkers = el.totalWorkersInput.value;
-        building.activeWorkers = el.activeWorkersInput.value;
+        building.activeWorkers = String(activeWorkerTotal(building));
+        el.activeWorkersInput.value = building.activeWorkers;
         renderBuildingModeFields(building);
         return building;
       }
@@ -2110,6 +2149,39 @@
           `;
           article.appendChild(head);
 
+          if (state.editingTaskId === task.id) {
+            const inlineForm = document.createElement("div");
+            inlineForm.className = "inline-edit-form";
+            inlineForm.dataset.id = task.id;
+            const buildingSelect = building.buildingMode === BUILDING_MODE_DOUBLE
+              ? `
+                <div class="field">
+                  <label for="inlineBuilding-${task.id}">อาคาร</label>
+                  <select id="inlineBuilding-${task.id}" data-inline-field="building">
+                    ${subBuildingOptionsHtml(building, normalizeSubBuildingId(building, task.buildingId))}
+                  </select>
+                </div>
+              `
+              : "";
+            inlineForm.innerHTML = `
+              <p class="inline-edit-title">แก้ไขงานนี้</p>
+              ${buildingSelect}
+              <div class="field">
+                <label for="inlineName-${task.id}">ชื่องาน</label>
+                <input id="inlineName-${task.id}" data-inline-field="name" list="taskHistory" autocomplete="off" value="${escapeHtml(task.name)}">
+              </div>
+              <div class="field">
+                <label for="inlinePeople-${task.id}">จำนวนคน</label>
+                <input id="inlinePeople-${task.id}" data-inline-field="people" type="number" inputmode="numeric" min="1" step="1" value="${task.people}">
+              </div>
+              <div class="inline-edit-actions">
+                <button class="primary-btn" type="button" data-action="inline-save" data-id="${task.id}">บันทึก</button>
+                <button class="ghost-btn" type="button" data-action="inline-cancel" data-id="${task.id}">ยกเลิก</button>
+              </div>
+            `;
+            article.appendChild(inlineForm);
+          }
+
           const imageStatus = document.createElement("div");
           imageStatus.className = "image-status-grid";
           imageStatus.innerHTML = `
@@ -2266,7 +2338,9 @@
         const building = activeBuilding();
         if (!building) return "";
         const total = Math.max(0, Math.floor(Number(building.totalWorkers) || 0));
-        const active = Math.max(0, Math.floor(Number(building.activeWorkers) || 0));
+        const active = activeWorkerTotal(building);
+        building.activeWorkers = String(active);
+        el.activeWorkersInput.value = building.activeWorkers;
         const lines = [
           formatThaiDateShort(building.date || el.workDate.value),
         ];
@@ -2475,16 +2549,10 @@
       }
 
       function startEditingTask(task) {
-        const building = activeBuilding();
         state.editingTaskId = task.id;
-        el.taskForm.classList.add("editing");
-        el.taskNameInput.value = task.name;
-        el.peopleInput.value = task.people;
-        updateTaskBuildingOptions(building, normalizeSubBuildingId(building, task.buildingId));
-        el.taskSubmitBtn.textContent = "บันทึกงาน";
-        el.taskCancelEditBtn.classList.remove("hidden");
-        el.taskNameInput.focus();
-        el.taskForm.scrollIntoView({ behavior: "smooth", block: "center" });
+        renderTaskList();
+        const inlineName = document.getElementById(`inlineName-${task.id}`);
+        inlineName?.focus();
       }
 
       async function resizeTaskPairs(task, newPairCount) {
@@ -2541,6 +2609,28 @@
         }
       }
 
+      function fitCanvasText(ctx, text, maxWidth) {
+        const safeText = String(text || "");
+        if (ctx.measureText(safeText).width <= maxWidth) return safeText;
+        const ellipsis = "…";
+        let low = 0;
+        let high = safeText.length;
+        let best = ellipsis;
+
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          const candidate = `${safeText.slice(0, mid).trimEnd()}${ellipsis}`;
+          if (ctx.measureText(candidate).width <= maxWidth) {
+            best = candidate;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        return best;
+      }
+
       function drawCenteredFittedText(ctx, text, x, y, maxWidth, fontSize, minSize, family, weight = "700") {
         let size = fontSize;
         const safeText = String(text || "");
@@ -2553,7 +2643,16 @@
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.direction = "ltr";
-        ctx.fillText(safeText, x, y, maxWidth);
+        ctx.fillText(fitCanvasText(ctx, safeText, maxWidth), x, y);
+      }
+
+      function drawCenteredTextInBox(ctx, text, x, y, width, height, fontSize, minSize, family, weight = "700") {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, width, height);
+        ctx.clip();
+        drawCenteredFittedText(ctx, text, x + width / 2, y + height / 2, width - 18, fontSize, minSize, family, weight);
+        ctx.restore();
       }
 
       function drawImageCover(ctx, image, x, y, width, height) {
@@ -2786,10 +2885,11 @@
 
           fillRoundRect(ctx, x, y, cardW, cardH, 8, "#f8faf8", "#d8e0da", 2);
           ctx.fillStyle = "#111111";
-          drawCenteredFittedText(ctx, pairShortTitle(item), x + cardW / 2, y + 34, cardW - 34, 28, 19, meta.thaiFamily, "800");
+          drawCenteredTextInBox(ctx, pairShortTitle(item), x + 14, y + 12, cardW - 28, 38, 27, 18, meta.thaiFamily, "800");
           ctx.font = `700 20px ${meta.thaiFamily}`;
           ctx.fillStyle = "#33433e";
           ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
           ctx.fillText(`จำนวน ${item.people} คน`, x + cardW / 2, y + 70);
 
           ctx.fillStyle = "#1c8cb8";
@@ -2852,7 +2952,7 @@
           ctx.fillRect(x, y + 80, cardW, 4);
 
           ctx.fillStyle = "#ffffff";
-          drawCenteredFittedText(ctx, pairShortTitle(item), x + cardW / 2, y + 32, cardW - 34, 26, 18, meta.thaiFamily, "800");
+          drawCenteredTextInBox(ctx, pairShortTitle(item), x + 14, y + 9, cardW - 28, 40, 25, 17, meta.thaiFamily, "800");
           ctx.fillStyle = "#d6bb63";
           drawCenteredFittedText(ctx, `จำนวน ${item.people} คน`, x + cardW / 2, y + 62, cardW - 34, 20, 15, meta.thaiFamily, "700");
 
@@ -3080,17 +3180,8 @@
         const buildingId = building.buildingMode === BUILDING_MODE_DOUBLE
           ? el.taskBuildingSelect.value
           : SUB_BUILDING_A;
-        const editingTask = state.editingTaskId
-          ? building.tasks.find((task) => task.id === state.editingTaskId)
-          : null;
-
-        if (editingTask) {
-          await updateTaskDetails(editingTask, name, people, buildingId);
-          showToast("บันทึกงานแล้ว");
-        } else {
-          building.tasks.push(makeTask(name, people, uid(), buildingId));
-          showToast("เพิ่มงานแล้ว");
-        }
+        building.tasks.push(makeTask(name, people, uid(), buildingId));
+        showToast("เพิ่มงานแล้ว");
 
         rememberValue(TASK_KEY, name);
         rememberBuildingNames(building);
@@ -3145,6 +3236,41 @@
 
         if (action === "edit") {
           startEditingTask(task);
+          return;
+        }
+
+        if (action === "inline-cancel") {
+          state.editingTaskId = null;
+          renderTaskList();
+          return;
+        }
+
+        if (action === "inline-save") {
+          const form = button.closest(".inline-edit-form");
+          const name = clampText(form?.querySelector('[data-inline-field="name"]')?.value);
+          const people = Math.floor(Number(form?.querySelector('[data-inline-field="people"]')?.value));
+          const building = activeBuilding();
+          const buildingId = building?.buildingMode === BUILDING_MODE_DOUBLE
+            ? form?.querySelector('[data-inline-field="building"]')?.value
+            : SUB_BUILDING_A;
+
+          if (!name) {
+            showToast("กรอกชื่องานก่อน");
+            form?.querySelector('[data-inline-field="name"]')?.focus();
+            return;
+          }
+
+          if (!people || people < 1) {
+            showToast("กรอกจำนวนคนอย่างน้อย 1 คน");
+            form?.querySelector('[data-inline-field="people"]')?.focus();
+            return;
+          }
+
+          await updateTaskDetails(task, name, people, buildingId);
+          rememberValue(TASK_KEY, name);
+          state.editingTaskId = null;
+          sync();
+          showToast("บันทึกงานแล้ว");
           return;
         }
 
@@ -3269,7 +3395,6 @@
       });
 
       el.totalWorkersInput.addEventListener("input", sync);
-      el.activeWorkersInput.addEventListener("input", sync);
       el.copyReportBtn.addEventListener("click", copyReport);
       el.taskCancelEditBtn.addEventListener("click", () => resetTaskForm({ focus: true }));
 
