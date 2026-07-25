@@ -629,7 +629,6 @@
     .thumb button {
       position: absolute;
       top: 6px;
-      right: 6px;
       min-height: 30px;
       min-width: 30px;
       padding: 0;
@@ -638,6 +637,23 @@
       color: white;
       font-size: 1rem;
       line-height: 1;
+    }
+
+    .thumb .thumb-remove {
+      right: 6px;
+    }
+
+    .thumb .thumb-swap {
+      left: 6px;
+      background: oklch(0.220 0.070 165 / 0.84);
+      border: 1px solid oklch(0.980 0.010 165 / 0.42);
+      font-size: 1.05rem;
+    }
+
+    .thumb.swap-selected {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 5px oklch(0.680 0.115 157 / 0.18);
     }
 
     .preview-panel {
@@ -1246,6 +1262,7 @@
         buildings: [],
         activeBuildingId: null,
         pickTarget: null,
+        swapTarget: null,
         editingTaskId: null,
         toastTimer: null,
         imageDb: null,
@@ -2239,6 +2256,11 @@
       function makeThumb(task, side, index) {
         const wrap = document.createElement("div");
         wrap.className = `thumb ${side}`;
+        const selected = state.swapTarget
+          && state.swapTarget.taskId === task.id
+          && state.swapTarget.side === side
+          && state.swapTarget.index === index;
+        if (selected) wrap.classList.add("swap-selected");
         const image = task[side][index];
         const label = side === "before" ? "Before" : "After";
 
@@ -2248,8 +2270,20 @@
           img.alt = `${label} ${index + 1}`;
           wrap.appendChild(img);
 
+          const swap = document.createElement("button");
+          swap.type = "button";
+          swap.className = "thumb-swap";
+          swap.dataset.action = "swap-image";
+          swap.dataset.id = task.id;
+          swap.dataset.side = side;
+          swap.dataset.index = String(index);
+          swap.setAttribute("aria-label", `สลับตำแหน่งรูป ${label} ช่อง ${index + 1}`);
+          swap.textContent = "↻";
+          wrap.appendChild(swap);
+
           const remove = document.createElement("button");
           remove.type = "button";
+          remove.className = "thumb-remove";
           remove.dataset.action = "remove-image";
           remove.dataset.id = task.id;
           remove.dataset.side = side;
@@ -2510,6 +2544,52 @@
         return { moved, persistenceMiss };
       }
 
+      async function swapImageSlots(first, second) {
+        if (!first || !second) return { swapped: false, reason: "missing" };
+        if (first.taskId === second.taskId && first.side === second.side && first.index === second.index) {
+          return { swapped: false, reason: "same" };
+        }
+        if (first.side !== second.side) return { swapped: false, reason: "side" };
+
+        const firstTask = findTask(first.taskId);
+        const secondTask = findTask(second.taskId);
+        if (!firstTask || !secondTask) return { swapped: false, reason: "missing" };
+
+        const firstImage = firstTask[first.side]?.[first.index];
+        const secondImage = secondTask[second.side]?.[second.index];
+        if (!firstImage || !secondImage) return { swapped: false, reason: "empty" };
+
+        const firstKey = imageKey(firstTask, first.side, first.index);
+        const secondKey = imageKey(secondTask, second.side, second.index);
+        let persistenceMiss = 0;
+
+        try {
+          const firstRecord = await getImageRecord(firstKey);
+          const secondRecord = await getImageRecord(secondKey);
+          const firstBlob = firstRecord?.blob || firstImage.blob;
+          const secondBlob = secondRecord?.blob || secondImage.blob;
+
+          if (secondBlob) {
+            const savedFirst = await saveImageRecord(firstKey, secondBlob);
+            if (!savedFirst) persistenceMiss += 1;
+          }
+
+          if (firstBlob) {
+            const savedSecond = await saveImageRecord(secondKey, firstBlob);
+            if (!savedSecond) persistenceMiss += 1;
+          }
+        } catch {
+          persistenceMiss += 1;
+        }
+
+        firstImage.key = secondKey;
+        secondImage.key = firstKey;
+        firstTask[first.side][first.index] = secondImage;
+        secondTask[second.side][second.index] = firstImage;
+
+        return { swapped: true, persistenceMiss };
+      }
+
       async function revokeBuildingImages(building) {
         await Promise.all(building.tasks.map(clearTaskImages));
       }
@@ -2527,6 +2607,7 @@
         building.tasks = [];
         building.totalWorkers = "";
         building.activeWorkers = "";
+        state.swapTarget = null;
         state.editingTaskId = null;
         el.taskNameInput.value = "";
         el.peopleInput.value = "";
@@ -3199,14 +3280,51 @@
         if (!task) return;
 
         if (action === "pick") {
+          state.swapTarget = null;
           state.pickTarget = { taskId: id, side };
           el.imagePicker.value = "";
           el.imagePicker.click();
           return;
         }
 
+        if (action === "swap-image") {
+          const slot = Number(index);
+          const current = { taskId: id, side, index: slot };
+          const first = state.swapTarget;
+
+          if (!first) {
+            state.swapTarget = current;
+            renderTaskList();
+            showToast("เลือกรูปปลายทางเพื่อสลับตำแหน่ง");
+            return;
+          }
+
+          if (first.side !== side) {
+            state.swapTarget = current;
+            renderTaskList();
+            showToast("สลับได้เฉพาะฝั่งเดียวกัน เลือกรูปใหม่แล้ว");
+            return;
+          }
+
+          const result = await swapImageSlots(first, current);
+          state.swapTarget = null;
+          sync();
+
+          if (!result.swapped && result.reason === "same") {
+            showToast("ยกเลิกการเลือกรูปแล้ว");
+          } else if (!result.swapped) {
+            showToast("สลับรูปไม่สำเร็จ ลองเลือกรูปอีกครั้ง");
+          } else if (result.persistenceMiss) {
+            showToast("สลับรูปแล้ว แต่เก็บถาวรไม่ครบ");
+          } else {
+            showToast("สลับตำแหน่งรูปแล้ว");
+          }
+          return;
+        }
+
         if (action === "remove-image") {
           const slot = Number(index);
+          state.swapTarget = null;
           revokeImage(task[side][slot]);
           task[side][slot] = null;
           await deleteImageRecord(imageKey(task, side, slot)).catch(() => {});
@@ -3215,6 +3333,7 @@
         }
 
         if (action === "clear-images") {
+          state.swapTarget = null;
           await clearTaskImages(task);
           sync();
           showToast("ล้างรูปงานนี้แล้ว");
@@ -3222,6 +3341,7 @@
         }
 
         if (action === "move-after-before") {
+          state.swapTarget = null;
           const result = await moveAfterToBefore(task);
           sync();
           if (!result.moved) {
@@ -3277,6 +3397,7 @@
         if (action === "delete") {
           const building = activeBuilding();
           if (!building) return;
+          state.swapTarget = null;
           await clearTaskImages(task);
           building.tasks = building.tasks.filter((item) => item.id !== id);
           if (state.editingTaskId === id) resetTaskForm();
