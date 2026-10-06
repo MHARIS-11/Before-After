@@ -933,6 +933,114 @@
       display: block;
     }
 
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    .export-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: grid;
+      align-items: end;
+      padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+      background: oklch(0.150 0.025 112 / 0.58);
+    }
+
+    .export-dialog-card {
+      width: min(100%, 520px);
+      max-height: min(82vh, 680px);
+      margin: 0 auto;
+      padding: 18px;
+      overflow-y: auto;
+      border-radius: 16px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+
+    .export-dialog-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .export-dialog-head h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .export-dialog-head p,
+    .export-dialog-note {
+      margin: 5px 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .export-dialog-close {
+      flex: 0 0 42px;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--surface-strong);
+      color: var(--ink);
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .export-dialog-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .export-dialog-actions > button {
+      min-height: 48px;
+    }
+
+    .export-fallback {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .export-fallback strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .export-file-links {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .export-file-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-strong);
+      color: var(--ink);
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .export-line-warning {
+      margin: 12px 0 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: oklch(0.945 0.045 88);
+      color: oklch(0.340 0.070 75);
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -1212,6 +1320,30 @@
   <input class="sr-only" id="imagePicker" type="file" accept="image/*" multiple>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <div class="export-dialog hidden" id="iosExportDialog" role="dialog" aria-modal="true" aria-labelledby="iosExportTitle" aria-hidden="true">
+    <div class="export-dialog-card">
+      <div class="export-dialog-head">
+        <div>
+          <h2 id="iosExportTitle">PNG พร้อมบันทึก</h2>
+          <p id="iosExportSummary">สร้างรูปเรียบร้อยแล้ว</p>
+        </div>
+        <button class="export-dialog-close" type="button" id="iosExportCloseBtn" aria-label="ปิด">×</button>
+      </div>
+
+      <p class="export-dialog-note">กดปุ่มด้านล่าง แล้วเลือก “บันทึกรูปภาพ” ในเมนูของ iPhone</p>
+      <p class="export-line-warning hidden" id="iosLineWarning">หากเปิดจาก LINE แล้วเมนูบันทึกไม่ขึ้น ให้เปิดลิงก์นี้ใน Safari แล้วลองอีกครั้ง</p>
+
+      <div class="export-dialog-actions">
+        <button class="primary-btn" type="button" id="iosShareBtn">บันทึกรูปลง iPhone</button>
+      </div>
+
+      <div class="export-fallback">
+        <strong>ทางสำรอง: เปิดรูปแล้วกดค้างเพื่อบันทึก</strong>
+        <div class="export-file-links" id="iosExportLinks"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (async () => {
       "use strict";
@@ -1265,6 +1397,8 @@
         swapTarget: null,
         editingTaskId: null,
         toastTimer: null,
+        exportFiles: [],
+        exportUrls: [],
         imageDb: null,
         imageDbReady: false,
         imageFallbackReady: false,
@@ -1315,7 +1449,13 @@
         exportBtn: document.getElementById("exportBtn"),
         clearAllBtn: document.getElementById("clearAllBtn"),
         imagePicker: document.getElementById("imagePicker"),
-        toast: document.getElementById("toast")
+        toast: document.getElementById("toast"),
+        iosExportDialog: document.getElementById("iosExportDialog"),
+        iosExportSummary: document.getElementById("iosExportSummary"),
+        iosExportCloseBtn: document.getElementById("iosExportCloseBtn"),
+        iosShareBtn: document.getElementById("iosShareBtn"),
+        iosLineWarning: document.getElementById("iosLineWarning"),
+        iosExportLinks: document.getElementById("iosExportLinks")
       };
 
       function todayInputValue() {
@@ -3185,8 +3325,25 @@
           .slice(0, 80) || "Before-After";
       }
 
+      function isIosDevice() {
+        return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+          || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      }
+
+      function isLineBrowser() {
+        return /\bLine\//i.test(navigator.userAgent);
+      }
+
+      function exportButtonLabel() {
+        return isIosDevice() ? "บันทึก PNG" : "ดาวน์โหลด PNG";
+      }
+
+      function canvasToPngBlob(canvas) {
+        return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      }
+
       async function downloadCanvas(canvas, name) {
-        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        const blob = await canvasToPngBlob(canvas);
         if (!blob) throw new Error("ไม่สามารถสร้างไฟล์ PNG ได้");
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -3200,6 +3357,109 @@
 
       function delay(ms) {
         return new Promise((resolve) => window.setTimeout(resolve, ms));
+      }
+
+      function clearPreparedExports() {
+        state.exportUrls.forEach((url) => URL.revokeObjectURL(url));
+        state.exportFiles = [];
+        state.exportUrls = [];
+        el.iosExportLinks.innerHTML = "";
+      }
+
+      function closeIosExportDialog() {
+        el.iosExportDialog.classList.add("hidden");
+        el.iosExportDialog.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("modal-open");
+        clearPreparedExports();
+        el.exportBtn.focus({ preventScroll: true });
+      }
+
+      function canShareExportFiles(files) {
+        if (typeof navigator.share !== "function") return false;
+        if (typeof navigator.canShare !== "function") return true;
+        try {
+          return navigator.canShare({ files });
+        } catch {
+          return false;
+        }
+      }
+
+      function openIosExportDialog(files) {
+        clearPreparedExports();
+        state.exportFiles = files;
+        el.iosExportSummary.textContent = `${files.length} รูป พร้อมบันทึกลงเครื่อง`;
+        el.iosLineWarning.classList.toggle("hidden", !isLineBrowser());
+
+        files.forEach((file, index) => {
+          const url = URL.createObjectURL(file);
+          state.exportUrls.push(url);
+          const link = document.createElement("a");
+          link.className = "export-file-link";
+          link.href = url;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.textContent = `เปิดรูปหน้า ${index + 1}`;
+          link.setAttribute("aria-label", `เปิดรูปหน้า ${index + 1} เพื่อกดค้างบันทึก`);
+          el.iosExportLinks.appendChild(link);
+        });
+
+        const shareReady = canShareExportFiles(files);
+        el.iosShareBtn.classList.toggle("hidden", !shareReady);
+        el.iosShareBtn.disabled = false;
+        el.iosShareBtn.textContent = "บันทึกรูปลง iPhone";
+        el.iosExportDialog.classList.remove("hidden");
+        el.iosExportDialog.setAttribute("aria-hidden", "false");
+        document.body.classList.add("modal-open");
+        (shareReady ? el.iosShareBtn : el.iosExportCloseBtn).focus({ preventScroll: true });
+
+        if (!shareReady) {
+          showToast("เครื่องนี้ไม่รองรับเมนูแชร์ ให้เปิดรูปด้านล่างเพื่อบันทึก");
+        }
+      }
+
+      async function createExportFiles(pages, building, date) {
+        const files = [];
+        for (let i = 0; i < pages.length; i += 1) {
+          const canvas = await renderSheetCanvas(pages[i], i + 1);
+          const blob = await canvasToPngBlob(canvas);
+          if (!blob) throw new Error(`ไม่สามารถสร้าง PNG หน้า ${i + 1} ได้`);
+          const name = `Before-After_${building}_${date}_หน้า-${i + 1}.png`;
+          files.push(new File([blob], name, { type: "image/png", lastModified: Date.now() }));
+        }
+        return files;
+      }
+
+      function sharePreparedExports() {
+        if (!state.exportFiles.length) {
+          showToast("ยังไม่มีรูปที่พร้อมบันทึก");
+          return;
+        }
+
+        const shareData = { files: state.exportFiles };
+        if (!canShareExportFiles(state.exportFiles)) {
+          showToast("เปิดเมนูแชร์ไม่ได้ ให้เปิดรูปด้านล่างเพื่อบันทึก");
+          return;
+        }
+
+        el.iosShareBtn.disabled = true;
+        el.iosShareBtn.textContent = "กำลังเปิดเมนู...";
+        showToast("เลือก “บันทึกรูปภาพ” ในเมนูของ iPhone");
+
+        const resetButton = () => {
+          el.iosShareBtn.disabled = false;
+          el.iosShareBtn.textContent = "บันทึกรูปลง iPhone";
+        };
+
+        window.setTimeout(resetButton, 1800);
+        navigator.share(shareData).then(() => {
+          showToast("เปิดเมนูบันทึกรูปแล้ว");
+          resetButton();
+        }).catch((error) => {
+          resetButton();
+          if (error?.name !== "AbortError") {
+            showToast("เปิดเมนูแชร์ไม่ได้ ให้เปิดรูปด้านล่างเพื่อบันทึก");
+          }
+        });
       }
 
       async function exportPngPages() {
@@ -3220,6 +3480,13 @@
           const date = formatThaiDate(buildingData?.date || el.workDate.value).replaceAll("/", "-");
           const building = sanitizeFileName(displayBuildingName(buildingData) || el.buildingInput.value || "อาคาร");
 
+          if (isIosDevice()) {
+            const files = await createExportFiles(pages, building, date);
+            openIosExportDialog(files);
+            showToast(`สร้าง PNG ${files.length} หน้าแล้ว`);
+            return;
+          }
+
           for (let i = 0; i < pages.length; i += 1) {
             const canvas = await renderSheetCanvas(pages[i], i + 1);
             await downloadCanvas(canvas, `Before-After_${building}_${date}_หน้า-${i + 1}.png`);
@@ -3230,7 +3497,7 @@
         } catch (error) {
           showToast(error.message || "ดาวน์โหลดไม่สำเร็จ");
         } finally {
-          el.exportBtn.textContent = "ดาวน์โหลด PNG";
+          el.exportBtn.textContent = exportButtonLabel();
           el.exportBtn.disabled = pages.length === 0;
         }
       }
@@ -3524,7 +3791,18 @@
         document.getElementById("previewTitle").scrollIntoView({ behavior: "smooth", block: "start" });
       });
 
+      el.exportBtn.textContent = exportButtonLabel();
       el.exportBtn.addEventListener("click", exportPngPages);
+      el.iosShareBtn.addEventListener("click", sharePreparedExports);
+      el.iosExportCloseBtn.addEventListener("click", closeIosExportDialog);
+      el.iosExportDialog.addEventListener("click", (event) => {
+        if (event.target === el.iosExportDialog) closeIosExportDialog();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !el.iosExportDialog.classList.contains("hidden")) {
+          closeIosExportDialog();
+        }
+      });
 
       el.clearAllBtn.addEventListener("click", async () => {
         await clearAll();
